@@ -1,0 +1,43 @@
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:util="http://www.springframework.org/schema/util"
+    xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd
+    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd">
+
+    <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <property name="targetObject">
+            <!-- System.getProperties() -->
+            <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+                <property name="targetClass" value="java.lang.System" />
+                <property name="targetMethod" value="getProperties" />
+            </bean>
+        </property>
+        <property name="targetMethod" value="putAll" />
+        <property name="arguments">
+            <!-- The new Properties -->
+            <util:properties>
+                <prop key="java.naming.factory.initial">org.bonitasoft.example.jndi.SimpleMemoryContextFactory</prop>
+                <prop key="java.naming.factory.url.pkgs">org.bonitasoft.example.jndi</prop>
+            </util:properties>
+        </property>
+    </bean>
+    
+	<!-- Set up the mapping jndiName -> Datasource -->
+	<util:map id="jndiMapping">
+		<entry key="java:comp/env/bonitaDS" value-ref="bonitaDataSource" />
+		<entry key="java:comp/env/bonitaSequenceManagerDS" value-ref="bonitaSequenceManagerDataSource" />
+		<entry key="java:comp/UserTransaction" value-ref="BitronixTransactionManager" />
+	</util:map>
+
+	<!-- This is the base class that will allow to lookup the JNDI tree -->
+	<bean id="jndiTemplate" class="org.springframework.jndi.JndiTemplate" />
+
+	<!-- Bind the mapping into Carol -->
+	<bean id="jndiSetup" class="org.bonitasoft.example.jndi.MemoryJNDISetup" scope="singleton" init-method="init" destroy-method="clean">
+		<constructor-arg name="jndiTemplate" ref="jndiTemplate" />
+		<constructor-arg name="jndiMapping" ref="jndiMapping" />
+	</bean>
+
+</beans>

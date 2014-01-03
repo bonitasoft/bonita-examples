@@ -1,0 +1,44 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:util="http://www.springframework.org/schema/util"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+    http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+
+    <bean id="btm1" class="org.springframework.util.SystemPropertyUtils" factory-method="resolvePlaceholders">
+        <constructor-arg value="target/bonita-bt1.tlog" /> 
+    </bean>
+
+    <bean id="btm2" class="org.springframework.util.SystemPropertyUtils" factory-method="resolvePlaceholders">
+        <constructor-arg value="target/bonita-bt2.tlog" /> 
+    </bean>
+
+    <bean id="removeBtmFiles" class="org.bonitasoft.example.spring.FileRemover" depends-on="btm1, btm2">
+        <constructor-arg>
+            <util:list>
+                <ref bean="btm1" />
+                <ref bean="btm2" />
+            </util:list>
+        </constructor-arg>
+    </bean>
+    
+    <!--  Bitronix Transaction Manager embedded configuration -->
+    <bean id="btmConfig" factory-method="getConfiguration" class="bitronix.tm.TransactionManagerServices" depends-on="removeBtmFiles">
+        <property name="serverId" value="btm-server" />
+
+        <property name="logPart1Filename" ref="btm1" />
+        <property name="logPart2Filename" ref="btm2" />        
+        
+        <!-- property name="journal"><null/></property -->
+        <property name="filterLogStatus" value="true" />
+        <property name="debugZeroResourceTransaction" value="false" />
+        <property name="warnAboutZeroResourceTransaction" value="false" />
+        <!-- property name="defaultTransactionTimeout" value="300" /-->
+    </bean>
+
+    <!-- create BTM transaction manager -->
+    <bean id="BitronixTransactionManager" factory-method="getTransactionManager" class="bitronix.tm.TransactionManagerServices" depends-on="btmConfig" destroy-method="shutdown" />
+
+
+</beans>
