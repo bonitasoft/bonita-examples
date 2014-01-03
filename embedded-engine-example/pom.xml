@@ -1,20 +1,21 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	
+
 	<modelVersion>4.0.0</modelVersion>
-	
+
 	<groupId>org.bonitasoft.example</groupId>
 	<artifactId>embedded-engine-example</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
-	
+
 	<properties>
 		<bonita.engine.version>6.2.0</bonita.engine.version>
 		<h2.version>1.3.170</h2.version>
 		<btm.version>2.1.3</btm.version>
 		<bonecp.version>0.7.1.RELEASE</bonecp.version>
 	</properties>
-	
+
 	<dependencies>
+		<!-- Bonita Engine -->
 		<dependency>
 			<groupId>org.bonitasoft.engine</groupId>
 			<artifactId>bonita-client</artifactId>
@@ -25,12 +26,16 @@
 			<artifactId>bonita-server</artifactId>
 			<version>${bonita.engine.version}</version>
 		</dependency>
+
+		<!-- Bonita Home: only used to generate a Bonita Home in the targed directory -->
 		<dependency>
-			<groupId>org.bonitasoft.console</groupId>
+			<groupId>org.bonitasoft.engine</groupId>
 			<artifactId>bonita-home</artifactId>
 			<version>${bonita.engine.version}</version>
 			<type>zip</type>
 		</dependency>
+
+		<!-- Database -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
@@ -51,11 +56,12 @@
 			<version>${bonecp.version}</version>
 		</dependency>
 	</dependencies>
-	
+
 	<build>
-	<pluginManagement>
+		<pluginManagement>
 			<plugins>
-				<!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself. -->
+				<!--This plugin's configuration is used to store Eclipse m2e settings 
+					only. It has no influence on the Maven build itself. -->
 				<plugin>
 					<groupId>org.eclipse.m2e</groupId>
 					<artifactId>lifecycle-mapping</artifactId>
@@ -92,6 +98,7 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<!-- unpack Bonita Home -->
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
 				<executions>
@@ -117,7 +124,41 @@
 					</execution>
 				</executions>
 			</plugin>
+			<!-- executable jar -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>org.bonitasoft.example.App</mainClass>
+							<addClasspath>true</addClasspath>
+							<classpathPrefix>lib/</classpathPrefix>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>generate-package</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+						<configuration>
+							<ignoreDirFormatExtensions>true</ignoreDirFormatExtensions>
+							<finalName>${project.name}</finalName>
+							<descriptors>
+								<descriptor>assembly.xml</descriptor>
+							</descriptors>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
-	
+
 </project>

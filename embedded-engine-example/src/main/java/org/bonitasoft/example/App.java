@@ -110,7 +110,7 @@ public class App {
         // perform all necessary actions to create the Bonita platform
         createPlatform();
 
-        // create a an user that will deploy and execute processes
+        // create a user that will deploy and execute processes
         User user = createUser();
 
         // deploy a process
@@ -126,8 +126,8 @@ public class App {
         // delete the created user
         deleteUser(user);
 
-        // perform all necessary actions to destroy the platform
-        destroyPlatform();
+        // perform all necessary actions to delete the platform
+        deletePlatform();
 
         // undeploy the data source
         undeployDataSource();
@@ -135,14 +135,14 @@ public class App {
     }
 
     /**
-     * Check if the system property bonita.home is set. If not a RuntimeException is thrown.
+     * Check if the system property bonita.home is set. If not, a RuntimeException is thrown.
      */
     private static void checkBonitaHome() {
         String bonitaHome = System.getProperty(BONITA_HOME_KEY);
         if (bonitaHome == null) {
-            throw new RuntimeException("The system property bonita.home is not set: please, set this property with the path to the bonita home folder.\n "
-                    + "You can get a bonita home from BonitaBPMCommunity-<bonita.engine.version>-deploy.zip or use the one generate under \n"
-                    + "the folder target/home on this project by runing the command 'mvn clean install'.");
+            throw new RuntimeException("The system property bonita.home is not set. Please, set this property with the path to the bonita home folder.\n "
+                    + "You can get a bonita home from BonitaBPMCommunity-<bonita.engine.version>-deploy.zip or use the one generated under \n"
+                    + "the folder target/home on this project by running the command 'mvn clean install'.");
         }
     }
 
@@ -172,12 +172,12 @@ public class App {
     }
 
     /**
-     * Perform all necessary actions to destroy the platform
+     * Perform all necessary actions to delete the platform
      * 
      * @throws BonitaException
-     *             if an exception occurs when destroying the platform
+     *             if an exception occurs when deleting the platform
      */
-    private static void destroyPlatform() throws BonitaException {
+    private static void deletePlatform() throws BonitaException {
         // login as platform administrator
         PlatformSession session = doPlatformLogin(PLATFORM_ADMIN, PLATFORM_PASSWORD);
         try {
@@ -252,11 +252,11 @@ public class App {
         pdb.addStartEvent(startName);
         // add an automatic task
         pdb.addAutomaticTask(autoStepName);
-        // add an user task having the previously defined actor
+        // add a user task having the previously defined actor
         pdb.addUserTask(firstUserStepName, ACTOR_NAME);
-        // add another user task having the previously defined actor
+        // add another user task assigned to the previously defined actor
         pdb.addUserTask(secondUserStepName, ACTOR_NAME);
-        // add add an end event
+        // add an end event
         pdb.addEndEvent(endName);
         // defined transitions
         pdb.addTransition(startName, autoStepName);
@@ -269,7 +269,7 @@ public class App {
 
     /**
      * Display a menu and prompt for a action to perform. The chosen action is performed and a new action is prompted
-     * until the user decides to quit the application
+     * until the user decides to quit the application.
      * 
      * @param processDefinition
      *            the ProcesssDefinition
@@ -285,19 +285,19 @@ public class App {
             // show the menu and read the action chosen by the user
             choice = readLine(message);
             if ("1".equals(choice)) {
-                // if user choose 1 then start a new process instance
+                // if user chooses 1 then start a new process instance
                 startProcess(processDefinition);
             } else if ("2".equals(choice)) {
-                // if user choose 2 then list opened process instances
+                // if user chooses 2 then list opened process instances
                 listOpenedProcessInstances();
             } else if ("3".equals(choice)) {
-                // if user choose 3 then list archived process instances
+                // if user chooses 3 then list archived process instances
                 listArchivedProcessInstances();
             } else if ("4".equals(choice)) {
-                // if user choose 4 then list pending tasks
+                // if user chooses 4 then list pending tasks
                 listPendingTasks();
             } else if ("5".equals(choice)) {
-                // if user choose 5 execute the task chosen by the user
+                // if user chooses 5 execute the task chosen by the user
                 executeATask();
             } else if (!"0".equals(choice)) {
                 System.out.println("Invalid choice!");
@@ -390,7 +390,7 @@ public class App {
     private static SearchResult<ProcessInstance> getOpenProcessInstancePage(APISession session, int startIndex) throws BonitaException {
         // create a new SeachOptions with given start index and PAGE_SIZE as max number of elements
         SearchOptionsBuilder optionsBuilder = new SearchOptionsBuilder(startIndex, PAGE_SIZE);
-        // sort the result by the process instance id in the ascending order
+        // sort the result by the process instance id in ascending order
         optionsBuilder.sort(ProcessInstanceSearchDescriptor.ID, Order.ASC);
         // perform the request and return the result
         return getProcessAPI(session).searchProcessInstances(optionsBuilder.done());
@@ -580,8 +580,8 @@ public class App {
         APISession session = doTenantLogin(USER_NAME, PWD);
         try {
             ProcessRuntimeAPI processAPI = getProcessAPI(session);
-            // retrieve the task to be executed in order to print information like, task name and process instance id
-            // if you don't need these information you can assign and execute it directly without retrieving it
+            // retrieve the task to be executed in order to print information such as task name and process instance id
+            // if you don't need this information you can assign and execute it directly without retrieving it
             HumanTaskInstance taskToExecute = processAPI.getHumanTaskInstance(taskId);
             // assign the task
             processAPI.assignUserTask(taskToExecute.getId(), session.getUserId());
@@ -593,7 +593,7 @@ public class App {
             System.out.println("Task '" + taskToExecute.getName() + "' of process instance '" + taskToExecute.getRootContainerId() + "' executed by '"
                     + session.getUserName() + ".");
         } catch (ActivityInstanceNotFoundException e) {
-            // catch ActivityInstanceNotFoundException to cover the case where the user enter an invalid taks id
+            // catch ActivityInstanceNotFoundException to cover the case where the user enter an invalid tasks id
             System.out.println("No task found with id " + taskId);
         } finally {
             // logout
@@ -614,7 +614,7 @@ public class App {
         try {
             taskId = Long.parseLong(strId);
         } catch (Exception e) {
-            System.out.println(strId + " is not a valid id. You can find all taks's ids using the menu 'list pending tasks'.");
+            System.out.println(strId + " is not a valid id. You can find all task ids using the menu 'list pending tasks'.");
         }
         return taskId;
     }
@@ -632,7 +632,7 @@ public class App {
         APISession session = doTenantLogin(USER_NAME, PWD);
         try {
             System.out.println("Undeploying process...");
-            // before deleting a process is necessary to delete all its instances (opened or archived)
+            // before deleting a process it is necessary to delete all its instances (opened or archived)
             deleteOpenedProcessInstance(processDefinition, session);
             deleteArchivedProcessInstance(processDefinition, session);
 
@@ -692,7 +692,7 @@ public class App {
      *             if an exception occurs when deleting the user
      */
     private static void deleteUser(User user) throws BonitaException {
-        // In order to delete the only end user, it's necessary to log in with the technical user
+        // In order to delete the only end user, it's necessary to log in as the technical user
         APISession session = doTenantLogin(TECHNICAL_USER_NAME, TECHNICAL_USER_NAME);
         try {
             // delete user
@@ -705,7 +705,7 @@ public class App {
     }
 
     /**
-     * Create a end user
+     * Create an end user
      * 
      * @return the created user
      * @throws BonitaException
@@ -721,7 +721,7 @@ public class App {
             user = getIdentityAPI(session).createUser(USER_NAME, PWD);
             System.out.println("Created user '" + USER_NAME + "'.");
         } finally {
-            // technical user do logout
+            // technical user logs out
             doTenantLogout(session);
         }
         return user;
