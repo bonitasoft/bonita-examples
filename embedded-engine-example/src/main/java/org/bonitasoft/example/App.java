@@ -188,7 +188,7 @@ public class App {
 
             System.out.println("Cleaning and deleting the platform ...");
             // clean and delete the platform
-            getPlatformAPI(session).cleanAndDeletePlaftorm();;
+            getPlatformAPI(session).cleanAndDeletePlaftorm();
             System.out.println("Platform cleaned and deleted!");
         } finally {
             // logout
@@ -696,7 +696,7 @@ public class App {
         APISession session = doTenantLogin(TECHNICAL_USER_NAME, TECHNICAL_USER_NAME);
         try {
             // delete user
-            getIdentityAPI(session).deleteUser(user.getId());;
+            getIdentityAPI(session).deleteUser(user.getId());
             System.out.println("Deleted user '" + user.getUserName() + "'.");
         } finally {
             // logout
