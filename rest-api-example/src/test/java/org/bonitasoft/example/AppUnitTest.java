@@ -1,11 +1,9 @@
 package org.bonitasoft.example;
 
 import java.io.File;
-import java.io.IOException;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolVersion;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
@@ -16,65 +14,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 public class AppUnitTest {
-
-	/*
-	 * POST http://localhost:8080/bonita/API/identity/user/
-	 * {"userName":"john.doe"
-	 * ,"password":"bpm","password_confirm":"bpm","firstname"
-	 * :"John","lastname":"Doe"}
-	 */
-	@Test
-	public void testCreateUserShouldPOSTOnUserURI()
-			throws ClientProtocolException, IOException {
-		// Given
-		HttpClient mockClient = Mockito.mock(HttpClient.class);
-
-		App app = new App(mockClient, "http://domain.com/app");
-		String username = "walter.bates";
-		String password = "bpm";
-
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 201, ""));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
-
-		// When
-
-		app.createUser(username, password);
-
-		// Assert
-		Mockito.verify(mockClient).execute(
-				Mockito.argThat(new PostOnURIMatcher("/API/identity/user")),
-				Mockito.any(HttpContext.class));
-	}
-
-	/*
-	 * DELETE /api/identity/user
-	 */
-	@Test
-	public void testDeleteUserDELETEOnUserURI() throws Exception {
-		// Given
-		HttpClient mockClient = Mockito.mock(HttpClient.class);
-
-		App app = new App(mockClient, "http://domain.com/app");
-		String userid = "42";
-
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 201, ""));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
-
-		// When
-
-		app.deleteUser(userid);
-
-		// Assert
-		Mockito.verify(mockClient).execute(
-				Mockito.argThat(new DeleteOnURIMatcher("/API/identity/user")),
-				Mockito.any(HttpContext.class));
-	}
 
 	/*
 	 * POST http://localhost:8080/bonita/API/bpm/case/ {"processDefinitionId":
@@ -124,8 +63,8 @@ public class AppUnitTest {
 
 		// When
 
-		long userid = 12l;
-		app.listPendingTask(userid);
+		String userid = "12";
+		app.listPendingTasks(userid);
 
 		// Assert
 		Mockito.verify(mockClient).execute(
@@ -181,33 +120,6 @@ public class AppUnitTest {
 		Mockito.verify(mockClient).execute(
 				Mockito.argThat(new PostOnURIMatcher("/services/organization/import")),
 				Mockito.any(HttpContext.class));
-	}
-
-	// ------- ERROR MANAGEMENT ---------- //
-
-	@Test(expected = RuntimeException.class)
-	public void testExceptionOnHTTPResponseCodeOtherThan201()
-			throws ClientProtocolException, IOException {
-		// Given
-		HttpClient mockClient = Mockito.mock(HttpClient.class);
-
-		App app = new App(mockClient, "http://domain.com/app");
-		String username = "walter.bates";
-		String password = "bpm";
-
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 404,
-				"Test resource not found."));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
-
-		// When
-
-		app.createUser(username, password);
-
-		// Assert
-		// Runtime Exception should be thrown
 	}
 
 }

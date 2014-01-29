@@ -86,7 +86,8 @@ public class App {
 	private static final String ORGANIZATION_FILE = "ACME.xml";
 
 	/**
-	 * Resource file containing an actor mapping between an actor of the process and the organization
+	 * Resource file containing an actor mapping between an actor of the process
+	 * and the organization
 	 */
 	private static final String ACTOR_MAPPING_FILE = "actorMapping.xml";
 
@@ -103,10 +104,10 @@ public class App {
 	public static void main(String[] args) {
 		String uri = "http://localhost:8080/bonita";
 
-		PoolingClientConnectionManager conMan = new PoolingClientConnectionManager(
-				SchemeRegistryFactory.createDefault());
+		PoolingClientConnectionManager conMan = new PoolingClientConnectionManager(SchemeRegistryFactory.createDefault());
 		conMan.setMaxTotal(200);
 		conMan.setDefaultMaxPerRoute(200);
+
 		App app = new App(new DefaultHttpClient(conMan), uri);
 		app.start();
 	}
@@ -117,6 +118,7 @@ public class App {
 	}
 
 	public void start() {
+
 		// Ensure minimal configuration such as Organization
 		loginAsTechnicalUser();
 		importOrganization();
@@ -143,36 +145,169 @@ public class App {
 		}
 	}
 
-	private void undeployProcess(long processId) {
-
-		System.out.println("Disabling process '" + PROCESS_NAME + "' (ID:"
-				+ processId + ")...");
-		disableProcess(processId);
-		System.out.println("Process Disabled!");
-
-		System.out.println("Deleting process '" + PROCESS_NAME + "' (ID:"
-				+ processId + ")...");
-		consumeResponse(executeDeleteRequest("/API/bpm/process/" + processId));
-		System.out.println("Process deleted!");
+	private void loginAsTechnicalUser() {
+		loginAs(TECHNICAL_USER_NAME, TECHNICAL_PASSWORD);
 	}
 
-	private void disableProcess(long processId) {
-		String payloadAsString = "{\"activationState\":\"DISABLED\"}";
-		consumeResponse(executePutRequest("/API/bpm/process/" + processId,
-				payloadAsString));
+	public void loginAs(String username, String password) {
 
+		try {
+
+			CookieStore cookieStore = new BasicCookieStore();
+			httpContext = new BasicHttpContext();
+			httpContext.setAttribute(ClientContext.COOKIE_STORE, cookieStore);
+
+			String loginURL = "/loginservice";
+
+			// If you misspell a parameter you will get a HTTP 500 error
+			List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+			urlParameters.add(new BasicNameValuePair("username", username));
+			urlParameters.add(new BasicNameValuePair("password", password));
+			urlParameters.add(new BasicNameValuePair("redirect", "false"));
+
+			// UTF-8 is mandatory otherwise you get a NPE
+			UrlEncodedFormEntity entity = new UrlEncodedFormEntity(urlParameters, "utf-8");
+			executePostRequest(loginURL, entity);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+
+	}
+
+	private int executePostRequest(String apiURI, UrlEncodedFormEntity entity) {
+		try {
+			HttpPost postRequest = new HttpPost(bonitaURI + apiURI);
+
+			postRequest.setEntity(entity);
+
+			HttpResponse response = httpClient.execute(postRequest, httpContext);
+
+			return consumeResponse(response);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+
+	}
+
+	private int consumeResponse(HttpResponse response) {
+
+		consumeResponseIfNecessary(response);
+
+		return ensureStatusOk(response);
+	}
+
+	private void consumeResponseIfNecessary(HttpResponse response) {
+		if (response.getEntity() != null) {
+			BufferedReader rd;
+			try {
+				rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+
+				StringBuffer result = new StringBuffer();
+				String line = "";
+				while ((line = rd.readLine()) != null) {
+					result.append(line);
+				}
+				System.out.println(result);
+			} catch (Exception e) {
+				throw new RuntimeException("Failed to consume response.", e);
+			}
+		}
+	}
+
+	private int ensureStatusOk(HttpResponse response) {
+		if (response.getStatusLine().getStatusCode() != 201 && response.getStatusLine().getStatusCode() != 200) {
+			throw new RuntimeException("Failed : HTTP error code : " + response.getStatusLine().getStatusCode() + " : "
+					+ response.getStatusLine().getReasonPhrase());
+		}
+		return response.getStatusLine().getStatusCode();
 	}
 
 	private void importOrganization() {
-		importOrganizationFromFile(new File(getClass().getClassLoader()
-				.getResource(ORGANIZATION_FILE).getPath()));
+		importOrganizationFromFile(new File(getClass().getClassLoader().getResource(ORGANIZATION_FILE).getPath()));
+
+	}
+
+	public int importOrganizationFromFile(File organizationFile) {
+
+		try {
+			System.out.println("Deploying organization ... ");
+			HttpPost post = new HttpPost(bonitaURI + "/portal/organizationUpload");
+
+			MultipartEntity entity = new MultipartEntity();
+			entity.addPart("file", new FileBody(organizationFile));
+			post.setEntity(entity);
+
+			HttpResponse response = httpClient.execute(post, httpContext);
+			String uploadedFilePath = extractUploadedFilePathFromResponse(response);
+
+			String payloadAsString = "{\"organizationDataUpload\":\"" + uploadedFilePath + "\"}";
+			int result = consumeResponse(executePostRequest("/services/organization/import", payloadAsString));
+
+			System.out.println("Organization deployed!");
+			return result;
+
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
+
+	private String extractUploadedFilePathFromResponse(HttpResponse response) {
+		try {
+			return EntityUtils.toString(response.getEntity());
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+	}
+
+	private HttpResponse executePostRequest(String apiURI, String payloadAsString) {
+		try {
+			HttpPost postRequest = new HttpPost(bonitaURI + apiURI);
+
+			StringEntity input = new StringEntity(payloadAsString);
+			input.setContentType("application/json");
+
+			postRequest.setEntity(input);
+
+			HttpResponse response = httpClient.execute(postRequest, httpContext);
+
+			return response;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+
+	public void logout() {
+		System.out.println("Logging user out from REST API...");
+		consumeResponse(executeGetRequest("/logoutservice"));
+		System.out.println("User logged out!");
+	}
+
+	private HttpResponse executeGetRequest(String apiURI) {
+		try {
+			HttpGet getRequest = new HttpGet(bonitaURI + apiURI);
+
+			HttpResponse response = httpClient.execute(getRequest, httpContext);
+
+			return response;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
 
 	}
 
 	private String getUserIdFromSession() {
 		try {
-			HttpGet getRequest = new HttpGet(bonitaURI
-					+ "/API/system/session/unusedid");
+			HttpGet getRequest = new HttpGet(bonitaURI + "/API/system/session/unusedid");
 
 			HttpResponse response = httpClient.execute(getRequest, httpContext);
 
@@ -187,8 +322,7 @@ public class App {
 	private String extractUserIdFrom(HttpResponse response) {
 		try {
 			String session = EntityUtils.toString(response.getEntity());
-			String remain = session
-					.substring(session.indexOf("user_id\":") + 10);
+			String remain = session.substring(session.indexOf("user_id\":") + 10);
 			String userid = remain.substring(0, remain.indexOf("\""));
 			return userid;
 		} catch (Exception e) {
@@ -204,8 +338,7 @@ public class App {
 			long processId = installProcessFromUploadedBar(uploadedFilePath);
 			System.out.println("Process deployed with id: " + processId);
 
-			System.out.println("Enabling process '" + PROCESS_NAME + "' (ID:"
-					+ processId + ")...");
+			System.out.println("Enabling process '" + PROCESS_NAME + "' (ID:" + processId + ")...");
 			enableProcess(processId);
 			System.out.println("Process Enabled!");
 			return processId;
@@ -215,14 +348,7 @@ public class App {
 
 	}
 
-	private void enableProcess(long processId) {
-		String payloadAsString = "{\"activationState\":\"ENABLED\"}";
-		consumeResponse(executePutRequest("/API/bpm/process/" + processId,
-				payloadAsString));
-	}
-
-	private String uploadGeneratedBar() throws IOException,
-			ClientProtocolException {
+	private String uploadGeneratedBar() throws IOException, ClientProtocolException {
 		// build the process example
 		File barFile = buildProcessDefinition();
 
@@ -235,39 +361,6 @@ public class App {
 		HttpResponse response = httpClient.execute(post, httpContext);
 		barFile.delete();
 		return extractUploadedFilePathFromResponse(response);
-
-	}
-
-	private long installProcessFromUploadedBar(String uploadedFilePath) {
-		String payloadAsString = "{\"fileupload\":\"" + uploadedFilePath
-				+ "\"}";
-
-		return extractProcessId(executePostRequest("/API/bpm/process",
-				payloadAsString));
-
-	}
-
-	private long extractProcessId(HttpResponse response) {
-		ensureStatusOk(response);
-		try {
-			String processInJSON = EntityUtils.toString(response.getEntity());
-
-			String remain = processInJSON.substring(processInJSON
-					.indexOf("id\":") + 5);
-			String id = remain.substring(0, remain.indexOf("\""));
-
-			return Long.parseLong(id);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	private String extractUploadedFilePathFromResponse(HttpResponse response) {
-		try {
-			return EntityUtils.toString(response.getEntity());
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
 
 	}
 
@@ -288,8 +381,7 @@ public class App {
 			String endName = "End";
 
 			// create a new process definition with name and version
-			ProcessDefinitionBuilder pdb = new ProcessDefinitionBuilder()
-					.createNewInstance(PROCESS_NAME, "1.0");
+			ProcessDefinitionBuilder pdb = new ProcessDefinitionBuilder().createNewInstance(PROCESS_NAME, "1.0");
 			// add actor defined as initiator
 			pdb.addActor(ACTOR_NAME, true);
 			// add a start event
@@ -308,18 +400,14 @@ public class App {
 			pdb.addTransition(firstUserStepName, secondUserStepName);
 			pdb.addTransition(secondUserStepName, endName);
 
-			BusinessArchive bar = new BusinessArchiveBuilder()
-					.createNewBusinessArchive()
-					.setProcessDefinition(pdb.done())
+			BusinessArchive bar = new BusinessArchiveBuilder().createNewBusinessArchive().setProcessDefinition(pdb.done())
 					.setActorMapping(getActorMapping()).done(); // embed actor
 																// mapping
 																// directly in
 																// definition
-			File barOnFileSystem = new File(
-					System.getProperty("java.io.tmpdir"), "process.bar");
+			File barOnFileSystem = new File(System.getProperty("java.io.tmpdir"), "process.bar");
 			barOnFileSystem.deleteOnExit();
-			BusinessArchiveFactory.writeBusinessArchiveToFile(bar,
-					barOnFileSystem);
+			BusinessArchiveFactory.writeBusinessArchiveToFile(bar, barOnFileSystem);
 
 			return barOnFileSystem;
 		} catch (Exception e) {
@@ -331,8 +419,7 @@ public class App {
 
 		FileInputStream fileInputStream = null;
 
-		File file = new File(getClass().getClassLoader()
-				.getResource(ACTOR_MAPPING_FILE).getPath());
+		File file = new File(getClass().getClassLoader().getResource(ACTOR_MAPPING_FILE).getPath());
 
 		byte[] bFile = new byte[(int) file.length()];
 
@@ -355,133 +442,51 @@ public class App {
 		return bFile;
 
 	}
+	
+	private long installProcessFromUploadedBar(String uploadedFilePath) {
+		String payloadAsString = "{\"fileupload\":\"" + uploadedFilePath + "\"}";
 
-	private void loginAsTechnicalUser() {
-		loginAs(TECHNICAL_USER_NAME, TECHNICAL_PASSWORD);
+		return extractProcessId(executePostRequest("/API/bpm/process", payloadAsString));
+
 	}
 
-	public void loginAs(String username, String password) {
-
+	private long extractProcessId(HttpResponse response) {
+		ensureStatusOk(response);
 		try {
+			String processInJSON = EntityUtils.toString(response.getEntity());
 
-			CookieStore cookieStore = new BasicCookieStore();
-			httpContext = new BasicHttpContext();
-			httpContext.setAttribute(ClientContext.COOKIE_STORE, cookieStore);
+			String remain = processInJSON.substring(processInJSON.indexOf("id\":") + 5);
+			String id = remain.substring(0, remain.indexOf("\""));
 
-			String loginURL = "/loginservice";
+			return Long.parseLong(id);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-			// If you misspell a parameter you will get a HTTP 500 error
-			List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-			urlParameters.add(new BasicNameValuePair("username", username));
-			urlParameters.add(new BasicNameValuePair("password", password));
-			urlParameters.add(new BasicNameValuePair("redirect", "false"));
+	
+	private void enableProcess(long processId) {
+		String payloadAsString = "{\"activationState\":\"ENABLED\"}";
+		consumeResponse(executePutRequest("/API/bpm/process/" + processId, payloadAsString));
+	}
+	
+	private HttpResponse executePutRequest(String apiURI, String payloadAsString) {
+		try {
+			HttpPut putRequest = new HttpPut(bonitaURI + apiURI);
+			putRequest.addHeader("Content-Type", "application/json");
 
-			// UTF-8 is mandatory otherwise you get a NPE
-			UrlEncodedFormEntity entity = new UrlEncodedFormEntity(
-					urlParameters, "utf-8");
-			executePostRequest(loginURL, entity);
+			StringEntity input = new StringEntity(payloadAsString);
+			input.setContentType("application/json");
+			putRequest.setEntity(input);
+
+			return httpClient.execute(putRequest, httpContext);
 
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
-
 	}
-
-	private int executePostRequest(String apiURI, UrlEncodedFormEntity entity) {
-		try {
-			HttpPost postRequest = new HttpPost(bonitaURI + apiURI);
-
-			postRequest.setEntity(entity);
-
-			HttpResponse response = httpClient
-					.execute(postRequest, httpContext);
-
-			return consumeResponse(response);
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-
-	}
-
-	public void logout() {
-		System.out.println("Logging user out from REST API...");
-		consumeResponse(executeGetRequest("/logoutservice"));
-		System.out.println("User logged out!");
-	}
-
-	public int createUser(String username, String password) {
-
-		String apiURI = "/API/identity/user";
-
-		String payloadAsString = "{\"userName\":\"" + username
-				+ "\",\"password\":\"" + password
-				+ "\",\"password_confirm\":\"" + password
-				+ "\",\"firstname\":\"John\",\"lastname\":\"Doe\"}";
-
-		return consumeResponse(executePostRequest(apiURI, payloadAsString));
-
-	}
-
-	private int consumeResponse(HttpResponse response) {
-
-		consumeResponseIfNecessary(response);
-
-		return ensureStatusOk(response);
-	}
-
-	private int ensureStatusOk(HttpResponse response) {
-		if (response.getStatusLine().getStatusCode() != 201
-				&& response.getStatusLine().getStatusCode() != 200) {
-			throw new RuntimeException("Failed : HTTP error code : "
-					+ response.getStatusLine().getStatusCode() + " : "
-					+ response.getStatusLine().getReasonPhrase());
-		}
-		return response.getStatusLine().getStatusCode();
-	}
-
-	private void consumeResponseIfNecessary(HttpResponse response) {
-		if (response.getEntity() != null) {
-			BufferedReader rd;
-			try {
-				rd = new BufferedReader(new InputStreamReader(response
-						.getEntity().getContent()));
-
-				StringBuffer result = new StringBuffer();
-				String line = "";
-				while ((line = rd.readLine()) != null) {
-					result.append(line);
-				}
-				System.out.println(result);
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to consume response.", e);
-			}
-		}
-	}
-
-	public int deleteUser(String userid) {
-		String deleteURI = "/API/identity/user/" + userid;
-		return consumeResponse(executeDeleteRequest(deleteURI));
-
-	}
-
-	private HttpResponse executeDeleteRequest(String deleteURI) {
-		try {
-
-			HttpDelete deleteRequest = new HttpDelete(bonitaURI + deleteURI);
-			HttpResponse response = httpClient.execute(deleteRequest,
-					httpContext);
-
-			return response;
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-
-	}
-
+	
 	/**
 	 * Display a menu and prompt for a action to perform. The chosen action is
 	 * performed and a new action is prompted until the user decides to quit the
@@ -513,7 +518,75 @@ public class App {
 			}
 		} while (!"0".equals(choice));
 	}
+	
+	
+	/**
+	 * Get the content of menu to be displayed
+	 * 
+	 * @return the content of menu to be displayed
+	 */
+	private static String getMenutTextContent() {
+		StringBuilder stb = new StringBuilder("\nChoose the action to be executed:\n");
+		stb.append("0 - exit\n");
+		stb.append("1 - start a process\n");
+		stb.append("2 - list open process instances\n");
+		stb.append("3 - list archived process instances\n");
+		stb.append("4 - list pending tasks \n");
+		stb.append("5 - execute a task\n");
+		stb.append("Choice:");
+		String message = stb.toString();
+		return message;
+	}
+	
+	/**
+	 * Read a line from standard input
+	 * 
+	 * @param message
+	 *            the message to be displayed
+	 * @return the line read from standard input
+	 * @throws IOException
+	 *             if an exception occurs when reading a line
+	 */
+	private static String readLine(String message) {
+		System.out.println(message);
+		BufferedReader buffer = new BufferedReader(new InputStreamReader(System.in));
+		try {
+			return buffer.readLine();
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+	
+	public int startACase(long processDefinitionId) {
+		System.out.println("Starting a new case of process " + PROCESS_NAME + " (ID: " + processDefinitionId + ").");
+		String apiURI = "/API/bpm/case/";
 
+		String payloadAsString = "{\"processDefinitionId\": " + processDefinitionId + "}";
+
+		return consumeResponse(executePostRequest(apiURI, payloadAsString));
+
+	}
+	
+	private void listOpenedProcessInstances() {
+		consumeResponse(executeGetRequest("/API/bpm/case?p=0&c=100"));
+
+	}
+	
+	private void listArchivedProcessInstances() {
+		consumeResponse(executeGetRequest("/API/bpm/archivedCase?p=0&c=100"));
+
+	}
+	
+	/**
+	 * List 100 first pending tasks for the logged user
+	 */
+	public void listPendingTasks(String userId) {
+
+		consumeResponse(executeGetRequest("/API/bpm/humanTask?p=0&c=100&f=state%3dready&f=user_id%3d" + userId));
+
+	}
+	
 	private void executeATask(String userId) {
 		// get the task id to be executed
 		Long taskId = readTaskId();
@@ -523,14 +596,6 @@ public class App {
 		executeActivity(taskId);
 
 	}
-
-	private void assignActivity(Long taskId, String userId) {
-		String payloadAsString = "{\"assigned_id\":\"" + userId + "\"}";
-		consumeResponse(executePutRequest("/API/bpm/humanTask/" + taskId,
-				payloadAsString));
-
-	}
-
 	/**
 	 * Prompt for the task id to be executed
 	 * 
@@ -544,175 +609,55 @@ public class App {
 		try {
 			taskId = Long.parseLong(strId);
 		} catch (Exception e) {
-			System.out
-					.println(strId
-							+ " is not a valid id. You can find all task ids using the menu 'list pending tasks'.");
+			System.out.println(strId + " is not a valid id. You can find all task ids using the menu 'list pending tasks'.");
 		}
 		return taskId;
 	}
 
-	/**
-	 * List all pending tasks for the logged user
-	 */
-	private void listPendingTasks(String userId) {
-
-		consumeResponse(executeGetRequest("/API/bpm/humanTask?p=0&c=100&f=state%3dready&f=user_id%3d"
-				+ userId));
+	private void assignActivity(Long taskId, String userId) {
+		String payloadAsString = "{\"assigned_id\":\"" + userId + "\"}";
+		consumeResponse(executePutRequest("/API/bpm/humanTask/" + taskId, payloadAsString));
 
 	}
-
-	private void listArchivedProcessInstances() {
-		consumeResponse(executeGetRequest("/API/bpm/archivedCase?p=0&c=100"));
-
-	}
-
-	private void listOpenedProcessInstances() {
-		consumeResponse(executeGetRequest("/API/bpm/case?p=0&c=100"));
-
-	}
-
-	/**
-	 * Get the content of menu to be displayed
-	 * 
-	 * @return the content of menu to be displayed
-	 */
-	private static String getMenutTextContent() {
-		StringBuilder stb = new StringBuilder(
-				"\nChoose the action to be executed:\n");
-		stb.append("0 - exit\n");
-		stb.append("1 - start a process\n");
-		stb.append("2 - list open process instances\n");
-		stb.append("3 - list archived process instances\n");
-		stb.append("4 - list pending tasks \n");
-		stb.append("5 - execute a task\n");
-		stb.append("Choice:");
-		String message = stb.toString();
-		return message;
-	}
-
-	/**
-	 * Read a line from standard input
-	 * 
-	 * @param message
-	 *            the message to be displayed
-	 * @return the line read from standard input
-	 * @throws IOException
-	 *             if an exception occurs when reading a line
-	 */
-	private static String readLine(String message) {
-		System.out.println(message);
-		BufferedReader buffer = new BufferedReader(new InputStreamReader(
-				System.in));
-		try {
-			return buffer.readLine();
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-	}
-
-	public int startACase(long processDefinitionId) {
-		System.out.println("Starting a new case of process " + PROCESS_NAME
-				+ " (ID: " + processDefinitionId + ").");
-		String apiURI = "/API/bpm/case/";
-
-		String payloadAsString = "{\"processDefinitionId\": "
-				+ processDefinitionId + "}";
-
-		return consumeResponse(executePostRequest(apiURI, payloadAsString));
-
-	}
-
-	private HttpResponse executePostRequest(String apiURI,
-			String payloadAsString) {
-		try {
-			HttpPost postRequest = new HttpPost(bonitaURI + apiURI);
-
-			StringEntity input = new StringEntity(payloadAsString);
-			input.setContentType("application/json");
-
-			postRequest.setEntity(input);
-
-			HttpResponse response = httpClient
-					.execute(postRequest, httpContext);
-
-			return response;
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-	}
-
-	public int listPendingTask(long userid) {
-		String apiURI = "/API/bpm/humanTask?f=state%3dready&f=user_id%3d"
-				+ userid;
-		return consumeResponse(executeGetRequest(apiURI));
-
-	}
-
-	private HttpResponse executeGetRequest(String apiURI) {
-		try {
-			HttpGet getRequest = new HttpGet(bonitaURI + apiURI);
-
-			HttpResponse response = httpClient.execute(getRequest, httpContext);
-
-			return response;
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-
-	}
-
+	
 	public void executeActivity(long activityId) {
 		String apiURI = "/API/bpm/activity/" + activityId;
 		String payloadAsString = "{\"state\":\"completed\"}";
 
 		consumeResponse(executePutRequest(apiURI, payloadAsString));
 	}
+	
+	private void undeployProcess(long processId) {
 
-	private HttpResponse executePutRequest(String apiURI, String payloadAsString) {
+		disableProcess(processId);
+		deleteProcess(processId);
+	}
+	private void disableProcess(long processId) {
+		System.out.println("Disabling process '" + PROCESS_NAME + "' (ID:" + processId + ")...");
+		
+		String payloadAsString = "{\"activationState\":\"DISABLED\"}";
+		consumeResponse(executePutRequest("/API/bpm/process/" + processId, payloadAsString));
+		
+		System.out.println("Process Disabled!");
+	}
+	
+	private void deleteProcess(long processId) {
+		System.out.println("Deleting process '" + PROCESS_NAME + "' (ID:" + processId + ")...");
+
+		consumeResponse(executeDeleteRequest("/API/bpm/process/" + processId));
+
+		System.out.println("Process deleted!");
+	}
+	
+	private HttpResponse executeDeleteRequest(String deleteURI) {
 		try {
-			HttpPut putRequest = new HttpPut(bonitaURI + apiURI);
-			putRequest.addHeader("Content-Type", "application/json");
 
-			StringEntity input = new StringEntity(payloadAsString);
-			input.setContentType("application/json");
-			putRequest.setEntity(input);
+			HttpDelete deleteRequest = new HttpDelete(bonitaURI + deleteURI);
+			HttpResponse response = httpClient.execute(deleteRequest, httpContext);
 
-			return httpClient.execute(putRequest, httpContext);
-
+			return response;
 		} catch (Exception e) {
 			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-	}
-
-	public int importOrganizationFromFile(File organizationFile) {
-
-		try {
-			System.out.println("Deploying organization ... ");
-			HttpPost post = new HttpPost(bonitaURI
-					+ "/portal/organizationUpload");
-
-			MultipartEntity entity = new MultipartEntity();
-			entity.addPart("file", new FileBody(organizationFile));
-			post.setEntity(entity);
-
-			HttpResponse response = httpClient.execute(post, httpContext);
-			String uploadedFilePath = extractUploadedFilePathFromResponse(response);
-
-			String payloadAsString = "{\"organizationDataUpload\":\""
-					+ uploadedFilePath + "\"}";
-			int result = consumeResponse(executePostRequest(
-					"/services/organization/import", payloadAsString));
-
-			System.out.println("Organization deployed!");
-			return result;
-
-		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 
