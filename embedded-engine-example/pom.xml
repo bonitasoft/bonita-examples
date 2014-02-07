@@ -5,7 +5,7 @@
 
 	<groupId>org.bonitasoft.example</groupId>
 	<artifactId>embedded-engine-example</artifactId>
-	<version>1.0.1-SNAPHOT</version>
+	<version>1.0.1</version>
 
 	<properties>
 		<bonita.engine.version>6.2.2</bonita.engine.version>
