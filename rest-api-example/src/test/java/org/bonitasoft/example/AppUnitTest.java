@@ -19,7 +19,7 @@ public class AppUnitTest {
 	 * POST http://localhost:8080/bonita/API/bpm/case/ {"processDefinitionId":
 	 * <processId>}
 	 */
-	@Test 
+	@Test
 	public void testStartACasePOSTOnCaseURI() throws Exception {
 		// Given
 		HttpClient mockClient = Mockito.mock(HttpClient.class);
@@ -27,20 +27,16 @@ public class AppUnitTest {
 		App app = new App(mockClient, "http://domain.com/app");
 		long processDefinitionId = 42l;
 
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 201, ""));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
+		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(new ProtocolVersion("http", 1, 1), 201, ""));
+		Mockito.when(mockClient.execute(Mockito.any(HttpUriRequest.class), Mockito.any(HttpContext.class))).thenReturn(response);
 
 		// When
 
 		app.startACase(processDefinitionId);
 
 		// Assert
-		Mockito.verify(mockClient).execute(
-				Mockito.argThat(new PostOnURIMatcher("/API/bpm/case")),
-				Mockito.any(HttpContext.class));
+		Mockito.verify(mockClient)
+				.execute(Mockito.argThat(new PostOnURIMatcher("/API/bpm/case")), Mockito.any(HttpContext.class));
 	}
 
 	/*
@@ -55,11 +51,8 @@ public class AppUnitTest {
 
 		App app = new App(mockClient, "http://domain.com/app");
 
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 201, ""));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
+		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(new ProtocolVersion("http", 1, 1), 201, ""));
+		Mockito.when(mockClient.execute(Mockito.any(HttpUriRequest.class), Mockito.any(HttpContext.class))).thenReturn(response);
 
 		// When
 
@@ -67,8 +60,7 @@ public class AppUnitTest {
 		app.listPendingTasks(userid);
 
 		// Assert
-		Mockito.verify(mockClient).execute(
-				Mockito.argThat(new GetOnURIMatcher("/API/bpm/humanTask")),
+		Mockito.verify(mockClient).execute(Mockito.argThat(new GetOnURIMatcher("/API/bpm/humanTask")),
 				Mockito.any(HttpContext.class));
 	}
 
@@ -83,11 +75,8 @@ public class AppUnitTest {
 
 		App app = new App(mockClient, "http://domain.com/app");
 
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 201, ""));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
+		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(new ProtocolVersion("http", 1, 1), 201, ""));
+		Mockito.when(mockClient.execute(Mockito.any(HttpUriRequest.class), Mockito.any(HttpContext.class))).thenReturn(response);
 
 		// When
 
@@ -95,8 +84,7 @@ public class AppUnitTest {
 		app.executeActivity(activityId);
 
 		// Assert
-		Mockito.verify(mockClient).execute(
-				Mockito.argThat(new PutOnURIMatcher("/API/bpm/activity")),
+		Mockito.verify(mockClient).execute(Mockito.argThat(new PutOnURIMatcher("/API/bpm/activity")),
 				Mockito.any(HttpContext.class));
 	}
 
@@ -106,19 +94,15 @@ public class AppUnitTest {
 		HttpClient mockClient = Mockito.mock(HttpClient.class);
 
 		App app = new App(mockClient, "http://domain.com/app");
-		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(
-				new ProtocolVersion("http", 1, 1), 201, ""));
+		HttpResponse response = new BasicHttpResponse(new BasicStatusLine(new ProtocolVersion("http", 1, 1), 201, ""));
 		response.setEntity(new StringEntity("path_to_uploaded_file"));
-		Mockito.when(
-				mockClient.execute(Mockito.any(HttpUriRequest.class),
-						Mockito.any(HttpContext.class))).thenReturn(response);
-		String organizationFilePath= getClass().getClassLoader().getResource("ACME.xml").getPath();
+		Mockito.when(mockClient.execute(Mockito.any(HttpUriRequest.class), Mockito.any(HttpContext.class))).thenReturn(response);
+		String organizationFilePath = getClass().getClassLoader().getResource("ACME.xml").getPath();
 		// When
 		app.importOrganizationFromFile(new File(organizationFilePath));
 
 		// Assert
-		Mockito.verify(mockClient).execute(
-				Mockito.argThat(new PostOnURIMatcher("/services/organization/import")),
+		Mockito.verify(mockClient).execute(Mockito.argThat(new PostOnURIMatcher("/services/organization/import")),
 				Mockito.any(HttpContext.class));
 	}
 
