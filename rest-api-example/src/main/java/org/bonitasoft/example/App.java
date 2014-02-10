@@ -32,6 +32,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.protocol.ClientContext;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.FileBody;
@@ -55,6 +56,8 @@ import org.bonitasoft.engine.bpm.process.impl.ProcessDefinitionBuilder;
  */
 public class App {
 
+	private static final String BONITA_URI = "http://localhost:8080/bonita";
+	
 	/**
 	 * Tenant technical user username
 	 */
@@ -102,14 +105,18 @@ public class App {
 	private HttpContext httpContext;
 
 	public static void main(String[] args) {
-		String uri = "http://localhost:8080/bonita";
 
+		PoolingClientConnectionManager conMan = getConnectionManager();
+
+		App app = new App(new DefaultHttpClient(conMan), BONITA_URI);
+		app.start();
+	}
+
+	private static PoolingClientConnectionManager getConnectionManager() {
 		PoolingClientConnectionManager conMan = new PoolingClientConnectionManager(SchemeRegistryFactory.createDefault());
 		conMan.setMaxTotal(200);
 		conMan.setDefaultMaxPerRoute(200);
-
-		App app = new App(new DefaultHttpClient(conMan), uri);
-		app.start();
+		return conMan;
 	}
 
 	public App(HttpClient client, String bonitaURI) {
@@ -121,6 +128,7 @@ public class App {
 
 		// Ensure minimal configuration such as Organization
 		loginAsTechnicalUser();
+		makeSureLocaleIsActive(); // this is necessary to make API working after Tomcat restart.
 		importOrganization();
 		logout();
 
@@ -184,8 +192,10 @@ public class App {
 
 			HttpResponse response = httpClient.execute(postRequest, httpContext);
 
-			return consumeResponse(response);
+			return consumeResponse(response, true);
 
+		} catch (HttpHostConnectException e) {
+			throw new RuntimeException("Bonita bundle may not have been started, or the URL is invalid. Please verify hostname and port number. URL used is: " + BONITA_URI,e);
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
@@ -193,14 +203,17 @@ public class App {
 
 	}
 
-	private int consumeResponse(HttpResponse response) {
+	private int consumeResponse(HttpResponse response, boolean printResponse) {
 
-		consumeResponseIfNecessary(response);
+		String responseAsString = consumeResponseIfNecessary(response);
+		if(printResponse) {
+			System.out.println(responseAsString);
+		}
 
 		return ensureStatusOk(response);
 	}
 
-	private void consumeResponseIfNecessary(HttpResponse response) {
+	private String consumeResponseIfNecessary(HttpResponse response) {
 		if (response.getEntity() != null) {
 			BufferedReader rd;
 			try {
@@ -211,13 +224,19 @@ public class App {
 				while ((line = rd.readLine()) != null) {
 					result.append(line);
 				}
-				System.out.println(result);
+				return result.toString();
 			} catch (Exception e) {
 				throw new RuntimeException("Failed to consume response.", e);
 			}
+		} else {
+			return "";
 		}
 	}
-
+	
+	private void makeSureLocaleIsActive() {
+		consumeResponse(executeGetRequest("/API/system/i18ntranslation?f=locale%3den"), false);
+	}
+	
 	private int ensureStatusOk(HttpResponse response) {
 		if (response.getStatusLine().getStatusCode() != 201 && response.getStatusLine().getStatusCode() != 200) {
 			throw new RuntimeException("Failed : HTTP error code : " + response.getStatusLine().getStatusCode() + " : "
@@ -245,7 +264,7 @@ public class App {
 			String uploadedFilePath = extractUploadedFilePathFromResponse(response);
 
 			String payloadAsString = "{\"organizationDataUpload\":\"" + uploadedFilePath + "\"}";
-			int result = consumeResponse(executePostRequest("/services/organization/import", payloadAsString));
+			int result = consumeResponse(executePostRequest("/services/organization/import", payloadAsString),false);
 
 			System.out.println("Organization deployed!");
 			return result;
@@ -285,9 +304,7 @@ public class App {
 	}
 
 	public void logout() {
-		System.out.println("Logging user out from REST API...");
-		consumeResponse(executeGetRequest("/logoutservice"));
-		System.out.println("User logged out!");
+		consumeResponse(executeGetRequest("/logoutservice"),false);
 	}
 
 	private HttpResponse executeGetRequest(String apiURI) {
@@ -467,7 +484,7 @@ public class App {
 	
 	private void enableProcess(long processId) {
 		String payloadAsString = "{\"activationState\":\"ENABLED\"}";
-		consumeResponse(executePutRequest("/API/bpm/process/" + processId, payloadAsString));
+		consumeResponse(executePutRequest("/API/bpm/process/" + processId, payloadAsString),true);
 	}
 	
 	private HttpResponse executePutRequest(String apiURI, String payloadAsString) {
@@ -564,17 +581,17 @@ public class App {
 
 		String payloadAsString = "{\"processDefinitionId\": " + processDefinitionId + "}";
 
-		return consumeResponse(executePostRequest(apiURI, payloadAsString));
+		return consumeResponse(executePostRequest(apiURI, payloadAsString),true);
 
 	}
 	
 	private void listOpenedProcessInstances() {
-		consumeResponse(executeGetRequest("/API/bpm/case?p=0&c=100"));
+		consumeResponse(executeGetRequest("/API/bpm/case?p=0&c=100"),true);
 
 	}
 	
 	private void listArchivedProcessInstances() {
-		consumeResponse(executeGetRequest("/API/bpm/archivedCase?p=0&c=100"));
+		consumeResponse(executeGetRequest("/API/bpm/archivedCase?p=0&c=100"),true);
 
 	}
 	
@@ -583,7 +600,7 @@ public class App {
 	 */
 	public void listPendingTasks(String userId) {
 
-		consumeResponse(executeGetRequest("/API/bpm/humanTask?p=0&c=100&f=state%3dready&f=user_id%3d" + userId));
+		consumeResponse(executeGetRequest("/API/bpm/humanTask?p=0&c=100&f=state%3dready&f=user_id%3d" + userId),true);
 
 	}
 	
@@ -616,7 +633,7 @@ public class App {
 
 	private void assignActivity(Long taskId, String userId) {
 		String payloadAsString = "{\"assigned_id\":\"" + userId + "\"}";
-		consumeResponse(executePutRequest("/API/bpm/humanTask/" + taskId, payloadAsString));
+		consumeResponse(executePutRequest("/API/bpm/humanTask/" + taskId, payloadAsString),true);
 
 	}
 	
@@ -624,7 +641,7 @@ public class App {
 		String apiURI = "/API/bpm/activity/" + activityId;
 		String payloadAsString = "{\"state\":\"completed\"}";
 
-		consumeResponse(executePutRequest(apiURI, payloadAsString));
+		consumeResponse(executePutRequest(apiURI, payloadAsString),true);
 	}
 	
 	private void undeployProcess(long processId) {
@@ -636,7 +653,7 @@ public class App {
 		System.out.println("Disabling process '" + PROCESS_NAME + "' (ID:" + processId + ")...");
 		
 		String payloadAsString = "{\"activationState\":\"DISABLED\"}";
-		consumeResponse(executePutRequest("/API/bpm/process/" + processId, payloadAsString));
+		consumeResponse(executePutRequest("/API/bpm/process/" + processId, payloadAsString),true);
 		
 		System.out.println("Process Disabled!");
 	}
@@ -644,7 +661,7 @@ public class App {
 	private void deleteProcess(long processId) {
 		System.out.println("Deleting process '" + PROCESS_NAME + "' (ID:" + processId + ")...");
 
-		consumeResponse(executeDeleteRequest("/API/bpm/process/" + processId));
+		consumeResponse(executeDeleteRequest("/API/bpm/process/" + processId),true);
 
 		System.out.println("Process deleted!");
 	}
