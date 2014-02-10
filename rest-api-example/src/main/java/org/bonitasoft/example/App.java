@@ -100,9 +100,11 @@ public class App {
 	private static final String PROCESS_NAME = "My first process";
 
 	private final HttpClient httpClient;
+	private HttpContext httpContext;
+	
 	private final String bonitaURI;
 
-	private HttpContext httpContext;
+	
 
 	public static void main(String[] args) {
 
