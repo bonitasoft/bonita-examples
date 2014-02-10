@@ -86,13 +86,13 @@ public class App {
 	/**
 	 * Resource file containing an example of organization
 	 */
-	private static final String ORGANIZATION_FILE = "ACME.xml";
+	private static final String ORGANIZATION_FILE = "/ACME.xml";
 
 	/**
 	 * Resource file containing an actor mapping between an actor of the process
 	 * and the organization
 	 */
-	private static final String ACTOR_MAPPING_FILE = "actorMapping.xml";
+	private static final String ACTOR_MAPPING_FILE = "/actorMapping.xml";
 
 	/**
 	 * Name of the process created and deployed
@@ -248,7 +248,7 @@ public class App {
 	}
 
 	private void importOrganization() {
-		importOrganizationFromFile(new File(getClass().getClassLoader().getResource(ORGANIZATION_FILE).getPath()));
+		importOrganizationFromFile(new File(getClass().getResource(ORGANIZATION_FILE).getPath()));
 
 	}
 
@@ -438,7 +438,7 @@ public class App {
 
 		FileInputStream fileInputStream = null;
 
-		File file = new File(getClass().getClassLoader().getResource(ACTOR_MAPPING_FILE).getPath());
+		File file = new File(getClass().getResource(ACTOR_MAPPING_FILE).getPath());
 
 		byte[] bFile = new byte[(int) file.length()];
 
