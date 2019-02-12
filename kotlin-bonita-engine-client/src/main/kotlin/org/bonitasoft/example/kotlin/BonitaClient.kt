@@ -4,6 +4,7 @@ import org.bonitasoft.engine.api.APIClient
 import org.bonitasoft.engine.bpm.bar.BusinessArchiveBuilder
 import org.bonitasoft.engine.bpm.process.*
 import org.bonitasoft.engine.bpm.process.impl.ProcessDefinitionBuilder
+import org.bonitasoft.engine.exception.AlreadyExistsException
 import org.bonitasoft.engine.exception.BonitaException
 import org.bonitasoft.engine.exception.DeletionException
 import org.bonitasoft.engine.expression.ExpressionBuilder
@@ -51,7 +52,18 @@ class BonitaClient(private val apiClient: APIClient) {
         // Create a business archive from this definition
         val businessArchive =
             BusinessArchiveBuilder().createNewBusinessArchive().setProcessDefinition(processWithOps.done()).done()
-        val processDefinition = processAPI.deploy(businessArchive)
+        val processDefinition: ProcessDefinition?
+        processDefinition = try {
+            processAPI.deploy(businessArchive)
+        } catch (e: AlreadyExistsException) {
+            processAPI.disableAndDeleteProcessDefinition(
+                processAPI.getProcessDefinitionId(
+                    "processWithOperations",
+                    "1.0"
+                )
+            )
+            processAPI.deploy(businessArchive)
+        }
         val user = apiClient.identityAPI.getUserByUserName("walter.bates")
 
         // Allow walter.bates to start the process and execute the task:

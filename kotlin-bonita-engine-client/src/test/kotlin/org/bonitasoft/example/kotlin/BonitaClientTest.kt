@@ -9,6 +9,7 @@ import org.junit.Before
 import org.junit.Test
 import java.util.*
 
+
 private const val REMOTE_SERVER_URL = "http://localhost:8080"
 private const val REMOTE_APPLICATION_NAME = "bonita"
 
@@ -32,6 +33,7 @@ class BonitaClientTest {
 
         // setup connection to a running remote server:
         setHttpAPIType()
+        // setEjbAPIType()
 
         // delete and create a new organization from provided file 'organization.xml':
         bonitaClient.replaceEntireOrganization()
@@ -73,6 +75,17 @@ class BonitaClientTest {
         map["application.name"] = applicationName
 
         APITypeManager.setAPITypeAndParams(ApiAccessType.HTTP, map)
+    }
+
+    private fun setEjbAPIType() {
+        println("Accessing Bonita using EJB3")
+
+        val parameters = HashMap<String, String>()
+        parameters["java.naming.factory.url.pkgs"] = "org.jboss.ejb.client.naming"
+        parameters["org.bonitasoft.engine.ejb.naming.reference"] =
+            "ejb:bonita-ear/bonita-ejb/serverAPIBean!org.bonitasoft.engine.api.internal.ServerAPI"
+
+        APITypeManager.setAPITypeAndParams(ApiAccessType.EJB3, parameters)
     }
 
 }
