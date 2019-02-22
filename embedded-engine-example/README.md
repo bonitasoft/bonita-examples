@@ -23,3 +23,11 @@ Simply unzip the previously built application and run it
     java -jar embedded-engine-example-*/embedded-engine-example-*.jar 
 
 from the root folder of this project.
+
+
+## Community vs Subscription
+
+This example Java application uses Community open-source APIs to illustrate how to embed Bonita Engine in an application.
+
+If you wish to use Subscription version of Bonita Engine, activate Maven profile 'subscription' declared in pom.xml and use the Subscription version of
+Engine APIs to benefit from the Subscription-only features.

@@ -26,6 +26,9 @@ import org.bonitasoft.engine.test.TestEngineImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * @author Emmanuel Duchastenier
+ */
 public class App {
 
     /**
@@ -115,9 +118,6 @@ public class App {
 
         // delete the created user
         deleteUser(user);
-
-        // perform all necessary actions to delete the platform
-//        deletePlatform();
 
         LOGGER.info("Completed successfully!!!");
     }
