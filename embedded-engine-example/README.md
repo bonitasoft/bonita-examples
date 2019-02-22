@@ -31,3 +31,6 @@ This example Java application uses Community open-source APIs to illustrate how 
 
 If you wish to use Subscription version of Bonita Engine, activate Maven profile 'subscription' declared in pom.xml and use the Subscription version of
 Engine APIs to benefit from the Subscription-only features.
+
+Of course, to use Subscription version of Bonita Engine, you must be a customer of Bonitasoft with a valid license file, and you must have access to
+Subscription version of Bonita Engine artifacts.
