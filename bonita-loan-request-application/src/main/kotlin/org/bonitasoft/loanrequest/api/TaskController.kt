@@ -11,7 +11,9 @@ class TaskController(val apiClient: APIClient) {
 
     @GetMapping("/tasks")
     fun list(): List<HumanTaskInstance>? {
-        return apiClient.processAPI.searchMyAvailableHumanTasks(apiClient.session.userId, SearchOptionsBuilder(0, 100).done()).result
+        return apiClient.processAPI.
+                searchMyAvailableHumanTasks(apiClient.session.userId, SearchOptionsBuilder(0, 100).done())
+                .result
     }
 
 }

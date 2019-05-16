@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class ProcessController(val apiClient: APIClient) {
 
+    // Expose the deployed processes through Rest Apis:
     @GetMapping("/processes")
     fun list(): List<ProcessDeploymentInfo> {
         apiClient.login("install", "install")

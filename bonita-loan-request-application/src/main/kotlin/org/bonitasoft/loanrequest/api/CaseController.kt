@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class CaseController(val apiClient: APIClient) {
 
+    // Expose the open process instances (=cases) for openness
     @GetMapping("/cases")
     fun list(): List<ProcessInstance> {
         return apiClient.processAPI
