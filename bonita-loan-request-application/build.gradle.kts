@@ -9,7 +9,7 @@ plugins {
 repositories {
     mavenLocal()
     jcenter()
-    // FIXME: remove this internal repository when Bonita 7.9.0 is out publically:
+    // FIXME: remove this internal repository when Bonita 7.9.0 is out publicly:
     maven("http://repositories.rd.lan/maven/all/")
 }
 
@@ -22,6 +22,9 @@ dependencies {
     // to deploy and run instances of processes:
     implementation("org.bonitasoft.engine:bonita-client:7.9.0-SNAPSHOT")
 
+    // API to simulate user waiting before executing a task:
+    implementation("org.awaitility:awaitility:2.0.0")
+
     // Libs to expose Rest API through an embedded application server:
     implementation("org.springframework.boot:spring-boot-starter-web:2.1.4.RELEASE")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.8")
@@ -32,8 +35,10 @@ dependencies {
 
     // don't forget to add your jdbc drivers corresponding to the database you are
     // pointing at (supported databases are H2, MySQL, PostgreSQL, MS SqlServer, Oracle DB:
-    runtime("com.h2database:h2:1.4.199")
-    // runtime("mysql:mysql-connector-java:8.0.14")
+//    runtime("com.h2database:h2:1.4.199")
+//     runtime("mysql:mysql-connector-java:8.0.14")
+    runtime("org.postgresql:postgresql:42.2.5")
+//    runtime("com.microsoft.sqlserver:mssql-jdbc:7.2.1.jre8")
 }
 
 // configure Kotlin compiler:

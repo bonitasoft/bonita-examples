@@ -12,9 +12,12 @@ class CaseController(val apiClient: APIClient) {
     // Expose the open process instances (=cases) for openness
     @GetMapping("/cases")
     fun list(): List<ProcessInstance> {
-        return apiClient.processAPI
-                .searchOpenProcessInstancesInvolvingUser(apiClient.session.userId, SearchOptionsBuilder(0, 100).done())
+        apiClient.login("install", "install")
+        val result = apiClient.processAPI
+                .searchOpenProcessInstances(SearchOptionsBuilder(0, 100).done())
                 .result
+        apiClient.logout()
+        return result
     }
 
 }

@@ -1,52 +1,118 @@
 package org.bonitasoft.loanrequest
 
+import org.awaitility.Awaitility
+import org.awaitility.Duration.ONE_SECOND
+import org.awaitility.Duration.TEN_SECONDS
 import org.bonitasoft.engine.api.APIClient
-import org.bonitasoft.engine.api.TenantAPIAccessor.getProcessAPI
+import org.bonitasoft.engine.bpm.bar.BusinessArchiveBuilder
+import org.bonitasoft.engine.bpm.flownode.HumanTaskInstance
+import org.bonitasoft.engine.bpm.process.DesignProcessDefinition
+import org.bonitasoft.engine.bpm.process.ProcessDefinition
 import org.bonitasoft.engine.bpm.process.impl.ProcessDefinitionBuilder
+import org.bonitasoft.engine.exception.BonitaException
+import org.bonitasoft.engine.identity.User
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
+import java.util.concurrent.Callable
 
 @SpringBootApplication
 class LoanRequestApplication
 
+val apiClient = APIClient()
+
 fun main(args: Array<String>) {
 
+    // Let's bootstrap SpringBoot application:
     runApplication<LoanRequestApplication>(*args)
 
-    val apiClient = APIClient()
-    apiClient.login("install", "install")
+    // Log in on Engine API:
+    loginAsTenantAdministrator()
     try {
-        createNewUser(apiClient)
-        createAndExecuteProcess(apiClient)
+        // Create a business user to interact with the process:
+        val newUser = createNewUser("scott", "bpm")
+        apiClient.logout()
+        // Create and execute the user tasks of the process with the created user:
+        apiClient.login("scott", "bpm")
+        createAndExecuteProcess(newUser)
+//        apiClient.logout()
+//        loginAsTenantAdministrator()
+//        removeUser(newUser)
     } finally {
         apiClient.logout()
     }
 }
 
-private fun createNewUser(apiClient: APIClient) {
-    apiClient.identityAPI.createUser("manu", "bpm")
+private fun loginAsTenantAdministrator() {
+    apiClient.login("install", "install")
 }
 
-fun createAndExecuteProcess(apiClient: APIClient) {
+private fun createNewUser(userName: String, password: String): User {
+    return apiClient.identityAPI.createUser(userName, password, "Scotty", "Dumont")
+}
+
+private fun removeUser(newUser: User) {
+    apiClient.identityAPI.deleteUser(newUser.id)
+}
+
+@Throws(BonitaException::class)
+fun createAndExecuteProcess(user: User) {
     val processBuilder = ProcessDefinitionBuilder().createNewInstance("LoanRequest", "1.0")
-    val ACTOR_NAME = "LoanRequester"
-    processBuilder.addActor(ACTOR_NAME)
-    val designProcessDefinition = processBuilder.addUserTask("step1", ACTOR_NAME).process
-    val processDefinition = deployAndEnableProcessWithActor(designProcessDefinition, ACTOR_NAME, user)
-    var processInstance = apiClient.processAPI.startProcess(processDefinition.getId())
-    waitForUserTask(processInstance, "step1")
+    val actor = "LoanRequester"
+    processBuilder.addActor(actor)
+    val userTaskName = "fillLoanRequestForm"
+    val designProcessDefinition = processBuilder.addUserTask(userTaskName, actor).process
+    val processDefinition = deployAndEnableProcessWithActor(designProcessDefinition, actor, user)
+    val processInstance = apiClient.processAPI.startProcess(processDefinition.id)
+    val processInstanceId = processInstance.id
 
-    val processInstanceId = processInstance.getId()
-    processInstance = apiClient.processAPI.getProcessInstance(processInstanceId)
-    assertEquals("started", processInstance.getState())
+    // Wait for the user task named "fillLoanRequestForm" to be ready to execute:
+    val userTask = waitForUserTask(user, processInstanceId, userTaskName)
 
-    apiClient.processAPI.setProcessInstanceState(processInstance, "initializing")
-    processInstance = apiClient.processAPI.getProcessInstance(processInstanceId)
-    assertEquals("initializing", processInstance.getState())
+    // Take the task and execute it:
+//    apiClient.processAPI.assignAndExecuteUserTask(user.id, userTask.id, emptyMap())
 
-    apiClient.processAPI.setProcessInstanceState(processInstance, "started")
-    processInstance = apiClient.processAPI.getProcessInstance(processInstanceId)
-    assertEquals("started", processInstance.getState())
+    // Wait for the whole process instance to finish executing:
+//    waitForProcessToFinish()
+//    Thread.sleep(5000)
 
-    disableAndDeleteProcess(processDefinition)
+//    println("Instance of Process LoanRequest(1.0) with id $processInstanceId has finished executing.")
+
+    // Deactivate and remove the process previously created:
+//    apiClient.processAPI.disableAndDeleteProcessDefinition(processDefinition.id)
+
+//    println("Process LoanRequest(1.0) uninstalled.")
 }
+
+fun waitForUserTask(user: User, processInstanceId: Long, userTaskName: String): HumanTaskInstance {
+    Awaitility.await("User task lasts long to be ready")
+            .atMost(TEN_SECONDS)
+            .pollInterval(ONE_SECOND)
+            .until(Callable<Boolean> {
+                apiClient.processAPI.getNumberOfPendingHumanTaskInstances(user.id) == 1L
+            })
+    return apiClient.processAPI.getHumanTaskInstances(processInstanceId, userTaskName, 0, 1)[0]
+}
+
+fun waitForProcessToFinish() {
+    Awaitility.await("Process instance lasts long to complete")
+            .atMost(TEN_SECONDS)
+            .pollInterval(ONE_SECOND)
+            .until(Callable<Boolean> {
+                apiClient.processAPI.numberOfArchivedProcessInstances == 1L
+            })
+}
+
+@Throws(BonitaException::class)
+fun deployAndEnableProcessWithActor(designProcessDefinition: DesignProcessDefinition,
+                                    actorName: String,
+                                    user: User): ProcessDefinition {
+    val processDefinition = apiClient.processAPI.deploy(
+            BusinessArchiveBuilder().createNewBusinessArchive().setProcessDefinition(designProcessDefinition).done()
+    )
+    with(apiClient.processAPI) {
+        addUserToActor(actorName, processDefinition, user.id)
+        enableProcess(processDefinition.id)
+    }
+    return processDefinition
+}
+
