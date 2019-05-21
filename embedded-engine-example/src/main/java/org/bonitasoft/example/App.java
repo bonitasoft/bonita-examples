@@ -13,6 +13,7 @@
  **/
 package org.bonitasoft.example;
 
+import org.bonitasoft.engine.BonitaEngine;
 import org.bonitasoft.engine.api.APIClient;
 import org.bonitasoft.engine.bpm.process.DesignProcessDefinition;
 import org.bonitasoft.engine.bpm.process.InvalidProcessDefinitionException;
@@ -21,8 +22,6 @@ import org.bonitasoft.engine.bpm.process.ProcessInstance;
 import org.bonitasoft.engine.bpm.process.impl.ProcessDefinitionBuilder;
 import org.bonitasoft.engine.exception.BonitaException;
 import org.bonitasoft.engine.identity.User;
-import org.bonitasoft.engine.test.TestEngine;
-import org.bonitasoft.engine.test.TestEngineImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,16 +62,10 @@ public class App {
 
     private static Logger LOGGER = LoggerFactory.getLogger(App.class);
 
-    private TestEngine testEngine = TestEngineImpl.getInstance();
+    private BonitaEngine bonitaEngine = new BonitaEngine();
 
     private void startEngine() throws Exception {
-        // Do not drop the whole platform each time Bonita Engine starts! :
-        testEngine.setDropOnStart(false);
-        // Do not drop the whole platform each time Bonita Engine stops! :
-        testEngine.setDropOnStop(false);
-
-        final boolean start = testEngine.start();
-        if (start) {
+        bonitaEngine.start();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     stopEngine();
@@ -80,12 +73,11 @@ public class App {
                     LOGGER.error(e.getMessage());
                 }
             }));
-        }
     }
 
     private void stopEngine() throws Exception {
         LOGGER.warn("Stopping Bonita Engine...");
-        testEngine.stop();
+        bonitaEngine.stop();
     }
 
     public static void main(String[] args) throws Exception {
