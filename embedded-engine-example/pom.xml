@@ -32,7 +32,7 @@
                 </dependency>
                 <dependency>
                     <groupId>org.bonitasoft.engine</groupId>
-                    <artifactId>bonita-test-api</artifactId>
+                    <artifactId>bonita-engine-standalone</artifactId>
                     <version>${bonita.engine.version}</version>
                 </dependency>
             </dependencies>
@@ -53,7 +53,7 @@
                 </dependency>
                 <dependency>
                     <groupId>com.bonitasoft.engine</groupId>
-                    <artifactId>bonita-test-api-sp</artifactId>
+                    <artifactId>bonita-engine-standalone-sp</artifactId>
                     <version>${bonita.engine.version}</version>
                 </dependency>
             </dependencies>
