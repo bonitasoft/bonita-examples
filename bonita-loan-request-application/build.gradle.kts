@@ -14,13 +14,15 @@ repositories {
 }
 
 dependencies {
+    val bonitaEngineVersion = "7.9.0-SNAPSHOT"
+
     // adding dependency on bonita-engine-spring-boot-starter automatically provides
     // and starts a Bonita Engine when used in a Spring Boot application:
-    implementation("org.bonitasoft.engine:bonita-engine-spring-boot-starter:7.9.0-SNAPSHOT")
+    implementation("org.bonitasoft.engine:bonita-engine-spring-boot-starter:$bonitaEngineVersion")
 
     // use bonita-client to be able to interact with the running Engine
     // to deploy and run instances of processes:
-    implementation("org.bonitasoft.engine:bonita-client:7.9.0-SNAPSHOT")
+    implementation("org.bonitasoft.engine:bonita-client:$bonitaEngineVersion")
 
     // API to simulate user waiting before executing a task:
     implementation("org.awaitility:awaitility:2.0.0")
