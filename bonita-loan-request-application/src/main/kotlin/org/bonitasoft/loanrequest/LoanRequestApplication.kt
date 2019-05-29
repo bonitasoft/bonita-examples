@@ -66,7 +66,8 @@ fun createAndExecuteProcess(user: User) {
     val processInstanceId = processInstance.id
 
     // Wait for the user task named "fillLoanRequestForm" to be ready to execute:
-    val userTask = waitForUserTask(user, processInstanceId, userTaskName)
+    // val userTask =
+    waitForUserTask(user, processInstanceId, userTaskName)
 
     // Take the task and execute it:
 //    apiClient.processAPI.assignAndExecuteUserTask(user.id, userTask.id, emptyMap())
