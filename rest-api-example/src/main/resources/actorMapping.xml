@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<actormapping:actorMappings xmlns:actormapping="http://www.bonitasoft.org/ns/actormapping/6.0">
-  <actorMapping name="MyActor">
-    <groups>
-      <group>/acme</group>
-    </groups>
-  </actorMapping>
-</actormapping:actorMappings>
