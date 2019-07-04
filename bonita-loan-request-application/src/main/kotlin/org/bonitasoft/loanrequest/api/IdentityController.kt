@@ -12,20 +12,11 @@ class IdentityController(val apiClient: APIClient) {
     @GetMapping("/users")
     fun list(): List<User> {
         apiClient.login("install", "install")
-        val users = apiClient.identityAPI
-                .searchUsers(SearchOptionsBuilder(0, 50).done())
-                .result
-        apiClient.logout()
-        return users
-    }
-
-    @GetMapping("/loadOrganization")
-    fun import() {
-        apiClient.login("install", "install")
-        val orgaAsString = this.javaClass.classLoader.getResourceAsStream("organization.xml").toString()
-        println("loading Organization content:\n$orgaAsString")
-        apiClient.identityAPI.importOrganization(orgaAsString)
-        apiClient.logout()
+        try {
+            return apiClient.identityAPI.searchUsers(SearchOptionsBuilder(0, 50).done()).result
+        } finally {
+            apiClient.logout()
+        }
     }
 
 }

@@ -4,6 +4,8 @@ import org.bonitasoft.engine.bpm.contract.Type
 import org.bonitasoft.engine.bpm.flownode.GatewayType
 import org.bonitasoft.engine.bpm.process.DesignProcessDefinition
 import org.bonitasoft.engine.bpm.process.impl.ProcessDefinitionBuilder
+import org.bonitasoft.engine.expression.ExpressionBuilder
+import kotlin.random.Random
 
 const val ACTOR_REQUESTER = "Requester"
 const val ACTOR_VALIDATOR = "Validator"
@@ -43,10 +45,13 @@ class LoanRequestProcessBuilder {
         // Define the Gateway:
         processBuilder.addGateway(DECISION_GATEWAY, GatewayType.EXCLUSIVE)
         // Define transitions:
-        processBuilder.addTransition(START_EVENT, REVIEW_REQUEST_TASK) // TODO: missing condition expression
+        processBuilder.addTransition(START_EVENT, REVIEW_REQUEST_TASK)
         processBuilder.addTransition(REVIEW_REQUEST_TASK, DECISION_GATEWAY)
-        processBuilder.addTransition(DECISION_GATEWAY, SIGN_CONTRACT_TASK)
-        processBuilder.addDefaultTransition(DECISION_GATEWAY, NOTIFY_REJECTION_TASK)
+        processBuilder.addTransition(DECISION_GATEWAY, SIGN_CONTRACT_TASK,
+                // let's simulate a human decision with a random accepted / rejected decision:
+                ExpressionBuilder().createConstantBooleanExpression(Random(System.currentTimeMillis()).nextBoolean())
+        )
+        processBuilder.addDefaultTransition(DECISION_GATEWAY, NOTIFY_REJECTION_TASK) // Default transition, taken is expression above returns false
         processBuilder.addTransition(SIGN_CONTRACT_TASK, ACCEPTED_END_EVENT)
         processBuilder.addTransition(NOTIFY_REJECTION_TASK, REJECTED_END_EVENT)
 

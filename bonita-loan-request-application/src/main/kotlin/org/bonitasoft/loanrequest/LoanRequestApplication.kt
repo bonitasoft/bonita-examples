@@ -7,6 +7,8 @@ import org.bonitasoft.engine.api.APIClient
 import org.bonitasoft.engine.bpm.flownode.HumanTaskInstance
 import org.bonitasoft.engine.exception.BonitaException
 import org.bonitasoft.engine.identity.User
+import org.bonitasoft.engine.search.SearchOptionsBuilder
+import org.bonitasoft.loanrequest.api.processIdAsString
 import org.bonitasoft.loanrequest.process.*
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -29,8 +31,8 @@ fun main(args: Array<String>) {
     loginAsTenantAdministrator()
     try {
         // Create a business user to interact with the process:
-        val requester = createNewUser("requester", "bpm")
-        val validator = createNewUser("validator", "bpm")
+        val requester = createNewUser("requester", "bpm", "Requester", "LoanRequester")
+        val validator = createNewUser("validator", "bpm", "Validator", "LoanValidator")
         switchToOtherUser(requester)
         createAndExecuteProcess(requester, validator)
         // apiClient.logout()
@@ -42,6 +44,7 @@ fun main(args: Array<String>) {
 }
 
 private fun loginAsTenantAdministrator() {
+    apiClient.logout()
     apiClient.login(TENANT_ADMIN_NAME, TENANT_ADMIN_PASSWORD)
 }
 
@@ -50,8 +53,8 @@ private fun switchToOtherUser(newUser: User) {
     apiClient.login(newUser.userName, "bpm")
 }
 
-private fun createNewUser(userName: String, password: String): User {
-    return apiClient.identityAPI.createUser(userName, password, "Firstname", "Lastname")
+private fun createNewUser(userName: String, password: String, firstName: String, lastName: String): User {
+    return apiClient.identityAPI.createUser(userName, password, firstName, lastName)
 }
 
 @Throws(BonitaException::class)
@@ -74,6 +77,9 @@ fun createAndExecuteProcess(initiator: User, validator: User) {
     // Take the task and execute it:
     apiClient.processAPI.assignAndExecuteUserTask(validator.id, reviewRequestTask.id, emptyMap())
 
+    val signContractTask = waitForUserTask(initiator, processInstanceId, SIGN_CONTRACT_TASK)
+    apiClient.processAPI.assignAndExecuteUserTask(initiator.id, signContractTask.id, emptyMap())
+
     // Wait for the whole process instance to finish executing:
     waitForProcessToFinish()
     // Thread.sleep(5000)
@@ -84,6 +90,7 @@ fun createAndExecuteProcess(initiator: User, validator: User) {
     // apiClient.processAPI.disableAndDeleteProcessDefinition(processDefinition.id)
 
     // println("Process LoanRequest(1.0) uninstalled.")
+    apiClient.processAPI.searchProcessDeploymentInfos(SearchOptionsBuilder(0, 100).done()).result.forEach { println(it.processIdAsString) }
 }
 
 fun waitForUserTask(user: User, processInstanceId: Long, userTaskName: String): HumanTaskInstance {
