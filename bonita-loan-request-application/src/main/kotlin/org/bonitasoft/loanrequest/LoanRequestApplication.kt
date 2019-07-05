@@ -5,6 +5,7 @@ import org.awaitility.Duration.FIVE_HUNDRED_MILLISECONDS
 import org.awaitility.Duration.TEN_SECONDS
 import org.bonitasoft.engine.api.APIClient
 import org.bonitasoft.engine.bpm.flownode.HumanTaskInstance
+import org.bonitasoft.engine.bpm.process.ProcessDefinition
 import org.bonitasoft.engine.exception.BonitaException
 import org.bonitasoft.engine.identity.User
 import org.bonitasoft.engine.search.SearchOptionsBuilder
@@ -30,11 +31,13 @@ fun main(args: Array<String>) {
     // Log in on Engine API:
     loginAsTenantAdministrator()
     try {
-        // Create a business user to interact with the process:
+        // Create business users to interact with the process:
         val requester = createNewUser("requester", "bpm", "Requester", "LoanRequester")
         val validator = createNewUser("validator", "bpm", "Validator", "LoanValidator")
-        switchToOtherUser(requester)
-        createAndExecuteProcess(requester, validator)
+        // Use this newly created users to create and execute the process flow:
+        loginWithAnotherUser(requester)
+        val processDefinition = createAndDeployProcess(requester, validator)
+        executeProcess(requester, validator, processDefinition)
         // apiClient.logout()
         // loginAsTenantAdministrator()
         // removeUser(newUser)
@@ -48,7 +51,7 @@ private fun loginAsTenantAdministrator() {
     apiClient.login(TENANT_ADMIN_NAME, TENANT_ADMIN_PASSWORD)
 }
 
-private fun switchToOtherUser(newUser: User) {
+private fun loginWithAnotherUser(newUser: User) {
     apiClient.logout()
     apiClient.login(newUser.userName, "bpm")
 }
@@ -58,39 +61,40 @@ private fun createNewUser(userName: String, password: String, firstName: String,
 }
 
 @Throws(BonitaException::class)
-fun createAndExecuteProcess(initiator: User, validator: User) {
-    // Create the process:
-    val designProcessDefinition = LoanRequestProcessBuilder().buildExampleProcess()
-    // Deploy the process and enable it:
-    val processDefinition = ProcessDeployer().deployAndEnableProcessWithActor(
-            designProcessDefinition, ACTOR_REQUESTER, initiator, ACTOR_VALIDATOR, validator)
+fun executeProcess(initiator: User, validator: User, processDefinition: ProcessDefinition) {
     // Start a new Loan request with an amount of 12000.0 (€ Euro):
     val processInstance = apiClient.processAPI.startProcessWithInputs(processDefinition.id, mapOf(Pair(CONTRACT_AMOUNT, 12000.0)))
 
-    val processInstanceId = processInstance.id
-
     // Now the validator needs to review it:
-    switchToOtherUser(validator)
+    loginWithAnotherUser(validator)
     // Wait for the user task named "fillLoanRequestForm" to be ready to execute:
-    val reviewRequestTask = waitForUserTask(validator, processInstanceId, REVIEW_REQUEST_TASK)
+    val reviewRequestTask = waitForUserTask(validator, processInstance.id, REVIEW_REQUEST_TASK)
 
     // Take the task and execute it:
     apiClient.processAPI.assignAndExecuteUserTask(validator.id, reviewRequestTask.id, emptyMap())
 
-    val signContractTask = waitForUserTask(initiator, processInstanceId, SIGN_CONTRACT_TASK)
+    val signContractTask = waitForUserTask(initiator, processInstance.id, SIGN_CONTRACT_TASK)
     apiClient.processAPI.assignAndExecuteUserTask(initiator.id, signContractTask.id, emptyMap())
 
     // Wait for the whole process instance to finish executing:
     waitForProcessToFinish()
     // Thread.sleep(5000)
 
-    println("Instance of Process LoanRequest(1.0) with id $processInstanceId has finished executing.")
+    println("Instance of Process LoanRequest(1.0) with id ${processInstance.id} has finished executing.")
 
     // Deactivate and remove the process previously created:
     // apiClient.processAPI.disableAndDeleteProcessDefinition(processDefinition.id)
 
     // println("Process LoanRequest(1.0) uninstalled.")
     apiClient.processAPI.searchProcessDeploymentInfos(SearchOptionsBuilder(0, 100).done()).result.forEach { println(it.processIdAsString) }
+}
+
+private fun createAndDeployProcess(initiator: User, validator: User): ProcessDefinition {
+    // Create the process:
+    val designProcessDefinition = LoanRequestProcessBuilder().buildExampleProcess()
+    // Deploy the process and enable it:
+    return ProcessDeployer().deployAndEnableProcessWithActor(
+            designProcessDefinition, ACTOR_REQUESTER, initiator, ACTOR_VALIDATOR, validator)
 }
 
 fun waitForUserTask(user: User, processInstanceId: Long, userTaskName: String): HumanTaskInstance {

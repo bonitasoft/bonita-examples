@@ -33,8 +33,14 @@ For this example, we will develop and interact with the following process.
 
 ## Let's write the application step by step
 
+In this example, we propose to use **Gradle** as the build tool, and **Kotlin** as the programming language.  
+If you are not familiar with Gradle, there is a Maven version of this example. [AVAILABLE SOON]  
+If you are not familiar with Kotlin, don't worry, it can be read easily if you know Java or a similar language.
+There is also a Java version of this example. [AVAILABLE SOON]  
+
+
 ### Boostrap of the application, using Spring boot
-Let's write a Gradle build with the minimum Spring boot + Kotlin requirements:
+Let's write a Gradle build (file `build.gradle.kts`) with the minimum Spring boot + Kotlin requirements:
 ```kotlin
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -90,6 +96,9 @@ In the current state, our application can already be run (but does not do anythi
 ```
 and can then be accessed at http://localhost:8080/
 
+
+### Adding Bonita Engine
+
 Now, let's add Bonita Engine in the equation in our `build.gradle.kts`:
 ```kotlin
 ...
@@ -125,9 +134,261 @@ We can see Engine startup logs in the console:
 |09:44:26.718|main|INFO |o.b.e.a.i.t.SetServiceState| THREAD_ID=1 | HOSTNAME=manu-laptop | TENANT_ID=1 | start tenant-level service org.bonitasoft.engine.business.data.impl.JPABusinessDataRepositoryImpl on tenant with ID 1
 ```
 
+### Let's code our first process
+
+Create a LoanRequestProcessBuilder class that builds a Bonita process and returns a DesignProcessDefinition.
+
+```kotlin
+package org.bonitasoft.loanrequest.process
+
+// imports removed for lisibility
+
+const val ACTOR_REQUESTER = "Requester"
+const val ACTOR_VALIDATOR = "Validator"
+
+const val START_EVENT = "Start Request"
+const val REVIEW_REQUEST_TASK = "Review Request"
+const val DECISION_GATEWAY = "isAccepted"
+const val SIGN_CONTRACT_TASK = "Sign contract"
+const val NOTIFY_REJECTION_TASK = "Notify rejection"
+const val ACCEPTED_END_EVENT = "Accepted"
+const val REJECTED_END_EVENT = "Rejected"
+
+const val CONTRACT_AMOUNT = "amount"
+
+class LoanRequestProcessBuilder {
+
+    fun buildExampleProcess(): DesignProcessDefinition {
+        val processBuilder = ProcessDefinitionBuilder().createNewInstance("LoanRequest", "1.0")
+        // Define the actors of the process:
+        processBuilder.addActor(ACTOR_REQUESTER, true) // only requester can initiate a new process
+        processBuilder.addActor(ACTOR_VALIDATOR) // only requester can initiate a new process
+        // Define the tasks
+        processBuilder.addUserTask(REVIEW_REQUEST_TASK, ACTOR_VALIDATOR)
+        processBuilder.addUserTask(SIGN_CONTRACT_TASK, ACTOR_REQUESTER) // Imagine this task involve paper signing
+
+        // For completion, this auto-task should have a connector on it,
+        // to notify the rejection (through email connector, for example):
+        processBuilder.addAutomaticTask(NOTIFY_REJECTION_TASK)
+
+        // Define the events:
+        processBuilder.addStartEvent(START_EVENT)
+        processBuilder.addEndEvent(ACCEPTED_END_EVENT)
+        processBuilder.addEndEvent(REJECTED_END_EVENT)
+        // Define the Gateway:
+        processBuilder.addGateway(DECISION_GATEWAY, GatewayType.EXCLUSIVE)
+        // Define transitions:
+        processBuilder.addTransition(START_EVENT, REVIEW_REQUEST_TASK)
+        processBuilder.addTransition(REVIEW_REQUEST_TASK, DECISION_GATEWAY)
+        processBuilder.addTransition(DECISION_GATEWAY, SIGN_CONTRACT_TASK,
+                // let's simulate a human decision with a random accepted / rejected decision:
+                ExpressionBuilder().createGroovyScriptExpression("random decision", "new java.util.Random(System.currentTimeMillis()).nextBoolean()", "java.lang.Boolean")
+        )
+        processBuilder.addDefaultTransition(DECISION_GATEWAY, NOTIFY_REJECTION_TASK) // Default transition, taken is expression above returns false
+        processBuilder.addTransition(SIGN_CONTRACT_TASK, ACCEPTED_END_EVENT)
+        processBuilder.addTransition(NOTIFY_REJECTION_TASK, REJECTED_END_EVENT)
+
+        // Define a contract on the process initiation:
+        processBuilder.addContract().addInput(CONTRACT_AMOUNT, Type.DECIMAL, "Amount of the loan requested")
+        // Here we imagine a more complex contract with more inputs...
+
+        return processBuilder.process
+    }
+
+}
+```
+
+Then this process must be deployed and enabled. Let's create a dedicated class for that:
+```kotlin
+package org.bonitasoft.loanrequest.process
+
+// imports...
+
+class ProcessDeployer {
+
+    @Throws(BonitaException::class)
+    fun deployAndEnableProcessWithActor(designProcessDefinition: DesignProcessDefinition,
+                                        requesterActor: String,
+                                        requesterUser: User,
+                                        validatorActor: String,
+                                        validatorUser: User): ProcessDefinition {
+        // Create the Actor Mapping with our Users:
+        val requester = Actor(requesterActor)
+        requester.addUser(requesterUser.userName)
+        val validator = Actor(validatorActor)
+        validator.addUser(validatorUser.userName)
+        val actorMapping = ActorMapping()
+        actorMapping.addActor(requester)
+        actorMapping.addActor(validator)
+        
+        // Create the Business Archive to deploy:
+        val businessArchive = BusinessArchiveBuilder().createNewBusinessArchive()
+                .setProcessDefinition(designProcessDefinition)
+                // set the actor mapping so that the process is resolved and can then be enabled:
+                .setActorMapping(actorMapping)
+                .done()
+
+        with(apiClient.processAPI) {
+            val processDefinition = deploy(businessArchive)
+            enableProcess(processDefinition.id)
+            return processDefinition
+        }
+    }
+}
+```
+
+Let's now call our build and deploy methods from our main application:
+
+```kotlin
+val apiClient = APIClient()
+
+// Log in on Engine API:
+loginAsTenantAdministrator()
+// Create business users to interact with the process:
+val requester = createNewUser("requester", "bpm", "Requester", "LoanRequester")
+val validator = createNewUser("validator", "bpm", "Validator", "LoanValidator")
+// Use this newly created users to create and execute the process flow:
+loginWithAnotherUser(requester)
+val processDefinition = createAndDeployProcess(requester, validator)
 
 
+private fun loginAsTenantAdministrator() {
+    apiClient.logout()
+    apiClient.login(TENANT_ADMIN_NAME, TENANT_ADMIN_PASSWORD)
+}
 
+private fun createNewUser(userName: String, password: String, firstName: String, lastName: String): User {
+    return apiClient.identityAPI.createUser(userName, password, firstName, lastName)
+}
+
+private fun loginWithAnotherUser(newUser: User) {
+    apiClient.logout()
+    apiClient.login(newUser.userName, "bpm")
+}
+
+private fun createAndDeployProcess(initiator: User, validator: User): ProcessDefinition {
+    // Create the process:
+    val designProcessDefinition = LoanRequestProcessBuilder().buildExampleProcess()
+    // Deploy the process and enable it:
+    return ProcessDeployer().deployAndEnableProcessWithActor(
+            designProcessDefinition, ACTOR_REQUESTER, initiator, ACTOR_VALIDATOR, validator)
+}
+```
+
+At this point, our process is created and deployed in Bonita.  
+Let's check that by writing a HTTP endpoint that lists all existing processes.  
+For that, we need to add a simple spring-boot dependency and its json library, to return the results in Json format:
+In file `build.gradle.kts`, in the `dependencies { }` section
+```kotlin
+    // Libs to expose Rest API through an embedded application server:
+    implementation("org.springframework.boot:spring-boot-starter-web:2.1.6.RELEASE")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.8")
+```
+Now we can write a simple Spring MVC controller to expose our processes through an HTTP API:
+```kotlin
+package org.bonitasoft.loanrequest.api
+
+import org.bonitasoft.engine.api.APIClient
+import org.bonitasoft.engine.bpm.process.ProcessDeploymentInfo
+import org.bonitasoft.engine.search.SearchOptionsBuilder
+import org.bonitasoft.loanrequest.process.CONTRACT_AMOUNT
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+// our apiClient is automagically :-) injected by Spring:
+class ProcessController(val apiClient: APIClient) {
+
+    // Expose the deployed processes through Rest Apis:
+    @GetMapping("/processes")
+    fun list(): List<ProcessDeploymentInfo> {
+        apiClient.login("install", "install")
+        val result = apiClient.processAPI.searchProcessDeploymentInfos(SearchOptionsBuilder(0, 100).done()).result
+        apiClient.logout()
+        return result
+    }
+}
+```
+Now restart our application with `./gradlew bootRun`.  
+Our application starts and creates and deploys our process.  
+Let's access http://localhost:8080/processes to list our processes. The result should be like:
+```json
+[
+    {
+        "id": 1,
+        "name": "LoanRequest",
+        "version": "1.0",
+        "displayDescription": null,
+        "deploymentDate": "2019-07-05T09:33:21.490+0000",
+        "deployedBy": 1,
+        "configurationState": "RESOLVED",
+        "activationState": "ENABLED",
+        "processId": 7450221031288910000,
+        "displayName": "LoanRequest",
+        "lastUpdateDate": "2019-07-05T09:33:21.607+0000",
+        "iconPath": null,
+        "description": null
+    }
+]
+```
+Beware that the field "processId" is incorrect, due to a limitation of the Json / Javascript `Long` size, which is
+smaller that the `Long` size in Java (or Kotlin). The symptom is that the last digits are 0000 instead of real value. 
+
+
+### Interact with the process
+
+Now we need to execute the process, as a human would do, so that the flow goes forward.  
+The interactions depend of the design of our process.  
+Let's complete our main application flow:
+```kotlin
+...
+executeProcess(requester, validator, processDefinition)
+
+@Throws(BonitaException::class)
+fun executeProcess(initiator: User, validator: User, processDefinition: ProcessDefinition) {
+    // Start a new Loan request with an amount of 12000.0 (€ Euro):
+    val processInstance = apiClient.processAPI.startProcessWithInputs(processDefinition.id, mapOf(Pair(CONTRACT_AMOUNT, 12000.0)))
+
+    // Now the validator needs to review it:
+    loginWithAnotherUser(validator)
+    // Wait for the user task named "fillLoanRequestForm" to be ready to execute:
+    val reviewRequestTask = waitForUserTask(validator, processInstance.id, REVIEW_REQUEST_TASK)
+
+    // Take the task and execute it:
+    apiClient.processAPI.assignAndExecuteUserTask(validator.id, reviewRequestTask.id, emptyMap())
+
+    val signContractTask = waitForUserTask(initiator, processInstance.id, SIGN_CONTRACT_TASK)
+    apiClient.processAPI.assignAndExecuteUserTask(initiator.id, signContractTask.id, emptyMap())
+
+    // Wait for the whole process instance to finish executing:
+    waitForProcessToFinish()
+
+    println("Instance of Process LoanRequest(1.0) with id ${processInstance.id} has finished executing.")
+}
+
+fun waitForUserTask(user: User, processInstanceId: Long, userTaskName: String): HumanTaskInstance {
+    Awaitility.await("User task should not last so long to be ready :-(")
+            .atMost(TEN_SECONDS)
+            .pollInterval(FIVE_HUNDRED_MILLISECONDS)
+            .until(Callable<Boolean> {
+                apiClient.processAPI.getNumberOfPendingHumanTaskInstances(user.id) == 1L
+            })
+    return apiClient.processAPI.getHumanTaskInstances(processInstanceId, userTaskName, 0, 1)[0]
+}
+
+fun waitForProcessToFinish() {
+    Awaitility.await("Process instance lasts long to complete")
+            .atMost(TEN_SECONDS)
+            .pollInterval(FIVE_HUNDRED_MILLISECONDS)
+            .until(Callable<Boolean> {
+                apiClient.processAPI.numberOfArchivedProcessInstances == 1L
+            })
+}
+
+```
+
+### Writing tests on top of our application
 
 Let's write some integration tests for our application:
 ```kotlin
@@ -144,7 +405,7 @@ class LoanRequestApplicationTests {
 
     @Test
     fun `process should be started and can be operated with human tasks`() {
-        // TO be completed
+        // TODO complete this test
     }
 
 }

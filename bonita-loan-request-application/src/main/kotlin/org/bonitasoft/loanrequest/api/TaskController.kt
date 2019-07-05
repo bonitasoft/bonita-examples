@@ -21,12 +21,22 @@ class TaskController(val apiClient: APIClient) {
         return result
     }
 
-    @GetMapping("/task/{taskId}/execute")
+    @GetMapping("/task/{taskId}/executeAsValidator")
     fun executeFirstHumanTask(@PathVariable taskId: Long) {
         apiClient.login("install", "install")
-        val user = apiClient.identityAPI.getUserByUserName("scott")
+        val user = apiClient.identityAPI.getUserByUserName("validator")
         apiClient.logout()
-        apiClient.login("scott", "bpm")
+        apiClient.login("validator", "bpm")
+        apiClient.processAPI.assignAndExecuteUserTask(user.id, taskId, emptyMap())
+        apiClient.logout()
+    }
+
+    @GetMapping("/task/{taskId}/executeAsRequester")
+    fun executeSignContractTask(@PathVariable taskId: Long) {
+        apiClient.login("install", "install")
+        val user = apiClient.identityAPI.getUserByUserName("requester")
+        apiClient.logout()
+        apiClient.login("requester", "bpm")
         apiClient.processAPI.assignAndExecuteUserTask(user.id, taskId, emptyMap())
         apiClient.logout()
     }
