@@ -23,7 +23,7 @@ class CaseController(val apiClient: APIClient) {
         }
     }
 
-    // Expose the open process instances (=cases not completed)
+    // Expose the finished process instances (=cases completed)
     @GetMapping("/completedcases")
     fun listCompleted(): List<ArchivedProcessInstance> {
         apiClient.login("install", "install")

@@ -1,17 +1,17 @@
 # Bonita Loan Request Application
 
 
-This application is an example of how one can embedded Bonita Engine (BPM workflow engine)
+This application is an example of how to embed Bonita Engine (BPM workflow engine)
 is a **Spring Boot** application.  
-The propose use-case is an application based on a process that allow someone to request
-a Loan to their bank. On its side, the bank can review the request, approve or reject the loan request
+The propose use-case is an application based on a process that allows someone to request
+a Loan from their bank. On its side, the bank can review the request, approve or reject the loan request
 and say why.
 
 
 ## Scope
 In this tutorial, you will learn how to write an application, using Spring Boot framework, that integrates
 Bonita Execution Engine to operate processes.  
-You will learn how to configure Bonita Engine to point to the database of your choice, tune the connection pool size
+You will learn how to configure Bonita Engine to point to the database of your choice and tune the connection pool.
 
 
 ## Prerequisites
@@ -87,7 +87,7 @@ import org.springframework.boot.runApplication
 class LoanRequestApplication
 
 fun main(args: Array<String>) {
-	runApplication<LoanRequestApplication>(*args)
+    runApplication<LoanRequestApplication>(*args)
 }
 ```
 In the current state, our application can already be run (but does not do anything) by typing in the command line:
@@ -284,7 +284,7 @@ In file `build.gradle.kts`, in the `dependencies { }` section
     implementation("org.springframework.boot:spring-boot-starter-web:2.1.6.RELEASE")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.9.8")
 ```
-Now we can write a simple Spring MVC controller to expose our processes through an HTTP API:
+Now we can write a simple [Spring MVC controller](https://docs.spring.io/spring/docs/current/spring-framework-reference/web.html) to expose our processes through an HTTP API:
 ```kotlin
 package org.bonitasoft.loanrequest.api
 
@@ -339,7 +339,7 @@ smaller that the `Long` size in Java (or Kotlin). The symptom is that the last d
 ### Interact with the process
 
 Now we need to execute the process, as a human would do, so that the flow goes forward.  
-The interactions depend of the design of our process.  
+The interactions depend on the design of our process.  
 Let's complete our main application flow:
 ```kotlin
 ...
@@ -352,12 +352,13 @@ fun executeProcess(initiator: User, validator: User, processDefinition: ProcessD
 
     // Now the validator needs to review it:
     loginWithAnotherUser(validator)
-    // Wait for the user task named "fillLoanRequestForm" to be ready to execute:
+    // Wait for the user task "Review Request" to be ready to execute, using a user member of "Validator" actor:
     val reviewRequestTask = waitForUserTask(validator, processInstance.id, REVIEW_REQUEST_TASK)
 
     // Take the task and execute it:
     apiClient.processAPI.assignAndExecuteUserTask(validator.id, reviewRequestTask.id, emptyMap())
 
+    // If the request has been accepted, wait for the "Sign contract" task to be ready and execute it:
     val signContractTask = waitForUserTask(initiator, processInstance.id, SIGN_CONTRACT_TASK)
     apiClient.processAPI.assignAndExecuteUserTask(initiator.id, signContractTask.id, emptyMap())
 
@@ -426,7 +427,75 @@ Simply put a `banner.txt` file in the `resources` folder with some ASCII art:
                                         |_|
 ```
 
+### Expose Business monitoring on our application flow
+Maybe we want our application to expose APIs to be able to follow the flow of our processes.  
+Simply add the following Rest Controller class to expose the **running** and **completed** cases (process instances):
+```kotlin
+package org.bonitasoft.loanrequest.api
 
+import org.bonitasoft.engine.api.APIClient
+// ...
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+class CaseController(val apiClient: APIClient) {
+
+    // Expose the open process instances (=cases not completed)
+    @GetMapping("/cases")
+    fun list(): List<ProcessInstance> {
+        apiClient.login("install", "install")
+        try {
+            return apiClient.processAPI
+                    .searchOpenProcessInstances(SearchOptionsBuilder(0, 100).done())
+                    .result
+        } finally {
+            apiClient.logout()
+        }
+    }
+
+    // Expose the finished process instances (=cases completed)
+    @GetMapping("/completedcases")
+    fun listCompleted(): List<ArchivedProcessInstance> {
+        apiClient.login("install", "install")
+        try {
+            return apiClient.processAPI
+                    .searchArchivedProcessInstances(SearchOptionsBuilder(0, 100).done())
+                    .result
+        } finally {
+            apiClient.logout()
+        }
+    }
+    
+}
+```
+
+Similarly, to expose the tasks ready to execute, add the 
+```kotlin
+package org.bonitasoft.loanrequest.api
+
+// ...
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+class TaskController(val apiClient: APIClient) {
+
+    @GetMapping("/tasks")
+    fun list(): List<HumanTaskInstance>? {
+        apiClient.login("install", "install")
+        val result = apiClient.processAPI.searchMyAvailableHumanTasks(
+                apiClient.session.userId,
+                SearchOptionsBuilder(0, 100).done())
+                .result
+        apiClient.logout()
+        return result
+    }
+}
+```
+
+## Full example
+This repository contains the full code of this example, ready to build / run.
 
 ## Build your application
 run `./gradlew build` to build the binaries. It will generate a jar file in `build/libs/` folder.
@@ -437,8 +506,41 @@ Simply run the gradle command:
 ```
 ./gradlew bootRun
 ```
-or run the previously built jar file:
+or run the previously-built jar file:
 ```bash
 java -jar build/libs/bonita-loan-request-application.jar
 ```
-You can then access the list of processes by opening a web browser at `http://localhost:8080/processes`
+You can then access the list of processes by opening a web browser at http://localhost:8080/processes.  
+The list of cases (process instances) is available at http://localhost:8080/cases.  
+The list of finished cases (completed process instances) is available at http://localhost:8080/completedcases.  
+The list of tasks is available at http://localhost:8080/tasks.  
+
+## Configure the database
+When nothing is specified, an embedded H2 database is created and used.  
+To use a different database, in folder `resources` create a standard Spring Boot configuration file named `application.properties` (or.yaml)
+and set the following properties. Here is an example with PostgreSQL:
+```properties
+# specify the database vendor you wish to use (supported values are h2, mysql, postgres, sqlserver, oracle):
+org.bonitasoft.engine.database.bonita.db-vendor=postgres
+# specify the URL to connect to your database:
+org.bonitasoft.engine.database.bonita.url=jdbc:postgresql://localhost:5432/bonita
+
+# specify the connection user to the database:
+org.bonitasoft.engine.database.bonita.user=bonita
+# specify the connection password to the database:
+org.bonitasoft.engine.database.bonita.password=bpm
+org.bonitasoft.engine.database.bonita.datasource.maxPoolSize=3
+
+# specify a different AppServer port if required:
+server.port=8080
+```
+The provided `application.properties` file contains examples for all Database vendors.
+
+Finally, don't forget to replace the default H2 dependency for your PostgreSQL drivers in file `build.gradle.kts`:
+```kotlin
+    // runtime("com.h2database:h2:1.4.199")
+    // runtime("mysql:mysql-connector-java:8.0.14")
+     runtime("org.postgresql:postgresql:42.2.5")
+    // runtime("com.microsoft.sqlserver:mssql-jdbc:7.2.1.jre8")
+    // Oracle database drivers are not open-source and thus cannot be included here directly
+```

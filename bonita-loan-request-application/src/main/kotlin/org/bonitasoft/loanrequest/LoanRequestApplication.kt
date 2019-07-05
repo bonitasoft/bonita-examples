@@ -8,8 +8,6 @@ import org.bonitasoft.engine.bpm.flownode.HumanTaskInstance
 import org.bonitasoft.engine.bpm.process.ProcessDefinition
 import org.bonitasoft.engine.exception.BonitaException
 import org.bonitasoft.engine.identity.User
-import org.bonitasoft.engine.search.SearchOptionsBuilder
-import org.bonitasoft.loanrequest.api.processIdAsString
 import org.bonitasoft.loanrequest.process.*
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -40,7 +38,12 @@ fun main(args: Array<String>) {
         executeProcess(requester, validator, processDefinition)
         // apiClient.logout()
         // loginAsTenantAdministrator()
-        // removeUser(newUser)
+
+        // To disable and remove the process previously created, use:
+        // apiClient.processAPI.disableAndDeleteProcessDefinition(processDefinition.id)
+
+        // To remove the users, we would do:
+        // removeUser(requester); removeUser(validator)
     } finally {
         apiClient.logout()
     }
@@ -67,12 +70,13 @@ fun executeProcess(initiator: User, validator: User, processDefinition: ProcessD
 
     // Now the validator needs to review it:
     loginWithAnotherUser(validator)
-    // Wait for the user task named "fillLoanRequestForm" to be ready to execute:
+    // Wait for the user task "Review Request" to be ready to execute, using a user member of "Validator" actor:
     val reviewRequestTask = waitForUserTask(validator, processInstance.id, REVIEW_REQUEST_TASK)
 
     // Take the task and execute it:
     apiClient.processAPI.assignAndExecuteUserTask(validator.id, reviewRequestTask.id, emptyMap())
 
+    // If the request has been accepted, wait for the "Sign contract" task to be ready and execute it:
     val signContractTask = waitForUserTask(initiator, processInstance.id, SIGN_CONTRACT_TASK)
     apiClient.processAPI.assignAndExecuteUserTask(initiator.id, signContractTask.id, emptyMap())
 
@@ -81,12 +85,6 @@ fun executeProcess(initiator: User, validator: User, processDefinition: ProcessD
     // Thread.sleep(5000)
 
     println("Instance of Process LoanRequest(1.0) with id ${processInstance.id} has finished executing.")
-
-    // Deactivate and remove the process previously created:
-    // apiClient.processAPI.disableAndDeleteProcessDefinition(processDefinition.id)
-
-    // println("Process LoanRequest(1.0) uninstalled.")
-    apiClient.processAPI.searchProcessDeploymentInfos(SearchOptionsBuilder(0, 100).done()).result.forEach { println(it.processIdAsString) }
 }
 
 private fun createAndDeployProcess(initiator: User, validator: User): ProcessDefinition {
