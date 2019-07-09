@@ -11,24 +11,19 @@
  * program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth
  * Floor, Boston, MA 02110-1301, USA.
  **/
-package org.bonitasoft.loanrequest.api
+package org.bonitasoft.loanrequest.process
 
-import org.bonitasoft.engine.api.APIClient
-import org.bonitasoft.engine.identity.User
-import org.bonitasoft.engine.search.SearchOptionsBuilder
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RestController
+import org.bonitasoft.engine.bpm.bar.BusinessArchive
+import org.bonitasoft.engine.bpm.bar.BusinessArchiveFactory
 
-@RestController
-class IdentityController(val apiClient: APIClient) {
+/**
+ * @author Emmanuel Duchastenier
+ */
+class ProcessLoader {
 
-    @GetMapping("/users")
-    fun list(): List<User> {
-        apiClient.login("install", "install")
-        try {
-            return apiClient.identityAPI.searchUsers(SearchOptionsBuilder(0, 50).done()).result
-        } finally {
-            apiClient.logout()
+    fun loadProcessFromBar(barFilePath: String): BusinessArchive {
+        this.javaClass.getResourceAsStream(barFilePath).use { resourceAsStream ->
+            return BusinessArchiveFactory.readBusinessArchive(resourceAsStream)
         }
     }
 

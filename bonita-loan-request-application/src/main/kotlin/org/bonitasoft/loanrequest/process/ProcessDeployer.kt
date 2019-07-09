@@ -1,5 +1,6 @@
 package org.bonitasoft.loanrequest.process
 
+import org.bonitasoft.engine.bpm.bar.BusinessArchive
 import org.bonitasoft.engine.bpm.bar.BusinessArchiveBuilder
 import org.bonitasoft.engine.bpm.bar.actorMapping.Actor
 import org.bonitasoft.engine.bpm.bar.actorMapping.ActorMapping
@@ -36,6 +37,15 @@ class ProcessDeployer {
                 .setActorMapping(actorMapping)
                 .done()
 
+        with(apiClient.processAPI) {
+            val processDefinition = deploy(businessArchive)
+            enableProcess(processDefinition.id)
+            return processDefinition
+        }
+    }
+
+    @Throws(BonitaException::class)
+    fun deployAndEnableBusinessArchiveWithoutAnyActor(businessArchive: BusinessArchive): ProcessDefinition {
         with(apiClient.processAPI) {
             val processDefinition = deploy(businessArchive)
             enableProcess(processDefinition.id)
