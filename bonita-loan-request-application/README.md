@@ -2,10 +2,9 @@
 
 
 This application is an example of how to embed Bonita Engine (BPM workflow engine)
-is a **Spring Boot** application.  
-The propose use-case is an application based on a process that allows someone to request
-a Loan from their bank. On its side, the bank can review the request, approve or reject the loan request
-and say why.
+in a **Spring Boot** application.  
+The proposed use-case is an application based on a process that allows someone to request
+a loan to their bank. This request will be reviewed, approved or rejectd by the bank which will give explanations for this decision.
 
 
 ## Scope
@@ -20,7 +19,7 @@ You will learn how to configure Bonita Engine to point to the database of your c
 If you just want to run an embedded H2 database, nothing is required.
 
 To have your application point to a MySQL, PostgreSQL, Microsoft SQL Server, or Oracle database make sure
-you have a Database server up and running, and that it contains a schema reserved for Bonita Engine (default name is `bonita`).  
+you have a Database server up and running, and that it contains a schema dedicated to Bonita Engine (default name is `bonita`).  
 For deeper details on database preparation for Bonita, see [the specific documentation page](https://documentation.bonitasoft.com/bonita/current/database-configuration).
 
 ### Processes
@@ -34,9 +33,9 @@ For this example, we will develop and interact with the following process.
 ## Let's write the application step by step
 
 In this example, we propose to use **Gradle** as the build tool, and **Kotlin** as the programming language.  
-If you are not familiar with Gradle, there is a Maven version of this example. [AVAILABLE SOON]  
+If you are not familiar with Gradle, there is a Maven version of this example. [AVAILABLE SOON - CHECK IF WE BUILD AN EXAMPLE ]  
 If you are not familiar with Kotlin, don't worry, it can be read easily if you know Java or a similar language.
-There is also a Java version of this example. [AVAILABLE SOON]  
+There is also a Java version of this example. [AVAILABLE SOON - IDEM]  
 
 
 ### Boostrap of the application, using Spring boot
@@ -99,7 +98,7 @@ and can then be accessed at http://localhost:8080/
 
 ### Adding Bonita Engine
 
-Now, let's add Bonita Engine in the equation in our `build.gradle.kts`:
+As a next step, let's add Bonita Engine in the equation in our `build.gradle.kts`:
 ```kotlin
 ...
 dependencies {
@@ -119,7 +118,7 @@ dependencies {
     ...
 }
 ```
-Now, through the magic of Spring boot, a Bonita Engine is automatically started when our application starts.  
+The magic of Spring boot operates, and a Bonita Engine is automatically started when our application starts.  
 We can see Engine startup logs in the console:
 ```
 |09:44:15.601|main|INFO |o.b.p.s.ScriptExecutor| configuration for Database vendor: h2
@@ -136,7 +135,9 @@ We can see Engine startup logs in the console:
 
 ### Let's code our first process
 
-Create a LoanRequestProcessBuilder class that builds a Bonita process and returns a DesignProcessDefinition.
+Our platform is running, we can now create a LoanRequestProcessBuilder class that builds a Bonita process and returns a DesignProcessDefinition.
+
+[ICI J'ECRIRAIS JUSTE UNE PHRASE POUR DIRE CE QU'ON VA CODER]
 
 ```kotlin
 package org.bonitasoft.loanrequest.process
@@ -277,7 +278,7 @@ private fun createAndDeployProcess(initiator: User, validator: User): ProcessDef
 
 At this point, our process is created and deployed in Bonita.  
 Let's check that by writing a HTTP endpoint that lists all existing processes.  
-For that, we need to add a simple spring-boot dependency and its json library, to return the results in Json format:
+To do so, we need to add a simple spring-boot dependency and its json library, to return the results in Json format:
 In file `build.gradle.kts`, in the `dependencies { }` section
 ```kotlin
     // Libs to expose Rest API through an embedded application server:
@@ -310,8 +311,8 @@ class ProcessController(val apiClient: APIClient) {
     }
 }
 ```
-Now restart our application with `./gradlew bootRun`.  
-Our application starts and creates and deploys our process.  
+Finally, let's restart our application with `./gradlew bootRun`.  
+Our application starts, creates and deploys our process.  
 Let's access http://localhost:8080/processes to list our processes. The result should be like:
 ```json
 [
@@ -334,13 +335,15 @@ Let's access http://localhost:8080/processes to list our processes. The result s
 ```
 Beware that the field "processId" is incorrect, due to a limitation of the Json / Javascript `Long` size, which is
 smaller that the `Long` size in Java (or Kotlin). The symptom is that the last digits are 0000 instead of real value. 
-
+[CA A UN IMPACT OU PAS? IL FAUT L'INDIQUER ET SI OUI, DIRE RAPIDEMENT COMMENT LE CONTOURNER]
 
 ### Interact with the process
 
-Now we need to execute the process, as a human would do, so that the flow goes forward.  
-The interactions depend on the design of our process.  
-Let's complete our main application flow:
+[A REVOIR AVEC TES MOTS]
+Our platform and process are now ready to be executed.
+We have to set interactions with the process to execute it as in any use case where there are human interaction during the flow.
+The interactions depend on the design of our process.
+I have prepared a few examples of application flows:
 ```kotlin
 ...
 executeProcess(requester, validator, processDefinition)
@@ -391,7 +394,7 @@ fun waitForProcessToFinish() {
 
 ### Writing tests on top of our application
 
-Let's write some integration tests for our application:
+Now, important step, we have to test our application. Let's write some integration tests for our application:
 ```kotlin
 package org.bonitasoft.loanrequest
 
