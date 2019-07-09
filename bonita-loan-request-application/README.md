@@ -2,17 +2,17 @@
 
 
 This application is an example of how to embed Bonita Engine (BPM workflow engine)
-is a **Spring Boot** application.  
-The propose use-case is an application based on a process that allows someone to request
-a Loan from their bank. On its side, the bank can review the request, approve or reject the loan request
-and say why.
+in a **Spring Boot** application.  
+The proposed use-case is an application based on a process that allows someone to request
+a loan to their bank. This request will be reviewed, approved or rejected by the bank which will give explanations for this decision.
 
 
 ## Scope
 In this tutorial, you will learn how to write an application, using Spring Boot framework, that integrates
 Bonita Execution Engine to operate processes.  
-You will learn how to configure Bonita Engine to point to the database of your choice and tune the connection pool.
-
+You will learn how to configure Bonita Engine to point to the database of your choice and tune the connection pool.  
+You will learn how to build processes programmatically, deploy and execute them.  
+You will also learn how to deploy processes generated with [Bonita Studio](https://documentation.bonitasoft.com/bonita/current/bonita-bpm-overview).
 
 ## Prerequisites
 ### Database
@@ -20,8 +20,9 @@ You will learn how to configure Bonita Engine to point to the database of your c
 If you just want to run an embedded H2 database, nothing is required.
 
 To have your application point to a MySQL, PostgreSQL, Microsoft SQL Server, or Oracle database make sure
-you have a Database server up and running, and that it contains a schema reserved for Bonita Engine (default name is `bonita`).  
-For deeper details on database preparation for Bonita, see [the specific documentation page](https://documentation.bonitasoft.com/bonita/current/database-configuration).
+you have a Database server up and running, and that it contains a schema dedicated to Bonita Engine (default name is `bonita`).  
+For deeper details on database preparation for Bonita, see [the specific documentation page](https://documentation.bonitasoft.com/bonita/current/database-configuration).  
+Then read below how to [configure the database access](#configure-the-database).
 
 ### Processes
 This tutorial assumes you have basic knowledge of BPMN / process designing.
@@ -99,7 +100,7 @@ and can then be accessed at http://localhost:8080/
 
 ### Adding Bonita Engine
 
-Now, let's add Bonita Engine in the equation in our `build.gradle.kts`:
+As a next step, let's add Bonita Engine in the equation in our `build.gradle.kts`:
 ```kotlin
 ...
 dependencies {
@@ -119,7 +120,7 @@ dependencies {
     ...
 }
 ```
-Now, through the magic of Spring boot, a Bonita Engine is automatically started when our application starts.  
+The magic of Spring boot operates, and a Bonita Engine is automatically started when our application starts.  
 We can see Engine startup logs in the console:
 ```
 |09:44:15.601|main|INFO |o.b.p.s.ScriptExecutor| configuration for Database vendor: h2
@@ -136,12 +137,13 @@ We can see Engine startup logs in the console:
 
 ### Let's code our first process
 
-Create a LoanRequestProcessBuilder class that builds a Bonita process and returns a DesignProcessDefinition.
+Our platform is running, we can now create a LoanRequestProcessBuilder class that builds a Bonita process and returns a DesignProcessDefinition.  
+Let's build the process designed on the diagram above.
 
 ```kotlin
 package org.bonitasoft.loanrequest.process
 
-// imports removed for lisibility
+// imports removed for readability
 
 const val ACTOR_REQUESTER = "Requester"
 const val ACTOR_VALIDATOR = "Validator"
@@ -251,16 +253,18 @@ val validator = createNewUser("validator", "bpm", "Validator", "LoanValidator")
 loginWithAnotherUser(requester)
 val processDefinition = createAndDeployProcess(requester, validator)
 
-
+// Utility function to log in to Bonita with the provided Administrator User:
 private fun loginAsTenantAdministrator() {
     apiClient.logout()
     apiClient.login(TENANT_ADMIN_NAME, TENANT_ADMIN_PASSWORD)
 }
 
+// Utility function to create a User in Bonita:
 private fun createNewUser(userName: String, password: String, firstName: String, lastName: String): User {
     return apiClient.identityAPI.createUser(userName, password, firstName, lastName)
 }
 
+// Utility function to log in to Bonita with a specific User:
 private fun loginWithAnotherUser(newUser: User) {
     apiClient.logout()
     apiClient.login(newUser.userName, "bpm")
@@ -277,7 +281,7 @@ private fun createAndDeployProcess(initiator: User, validator: User): ProcessDef
 
 At this point, our process is created and deployed in Bonita.  
 Let's check that by writing a HTTP endpoint that lists all existing processes.  
-For that, we need to add a simple spring-boot dependency and its json library, to return the results in Json format:
+To do so, we need to add a simple spring-boot dependency and its json library, to return the results in Json format:
 In file `build.gradle.kts`, in the `dependencies { }` section
 ```kotlin
     // Libs to expose Rest API through an embedded application server:
@@ -310,8 +314,8 @@ class ProcessController(val apiClient: APIClient) {
     }
 }
 ```
-Now restart our application with `./gradlew bootRun`.  
-Our application starts and creates and deploys our process.  
+Finally, let's restart our application with `./gradlew bootRun`.  
+Our application starts, creates and deploys our process.  
 Let's access http://localhost:8080/processes to list our processes. The result should be like:
 ```json
 [
@@ -333,8 +337,9 @@ Let's access http://localhost:8080/processes to list our processes. The result s
 ]
 ```
 Beware that the field "processId" is incorrect, due to a limitation of the Json / Javascript `Long` size, which is
-smaller that the `Long` size in Java (or Kotlin). The symptom is that the last digits are 0000 instead of real value. 
-
+smaller that the `Long` size in Java (or Kotlin). The symptom is that the last digits are 0000 instead of real value.  
+This limitation only exists if you use Json / Javascript to display a Long value.  
+To bypass this limitation, we could convert this value as a String before returning it through Rest APIs.
 
 ### Deploy a Process designed with Bonita Studio
 If you have designed your process using Bonita Studio (graphical tool), you can deploy the generated `.bar` file through
@@ -369,9 +374,10 @@ the same newer version of Bonita Studio.
 
 ### Interact with the process
 
-Now we need to execute the process, as a human would do, so that the flow goes forward.  
+Our platform and process are now ready to be executed.  
+We have to set interactions with the process to continue the execution flow.  
 The interactions depend on the design of our process.  
-Let's complete our main application flow:
+Here is an example of the application flow:
 ```kotlin
 ...
 executeProcess(requester, validator, processDefinition)
@@ -399,6 +405,7 @@ fun executeProcess(initiator: User, validator: User, processDefinition: ProcessD
     println("Instance of Process LoanRequest(1.0) with id ${processInstance.id} has finished executing.")
 }
 
+// Utility function to wait for a User task to be ready:
 fun waitForUserTask(user: User, processInstanceId: Long, userTaskName: String): HumanTaskInstance {
     Awaitility.await("User task should not last so long to be ready :-(")
             .atMost(TEN_SECONDS)
@@ -409,6 +416,7 @@ fun waitForUserTask(user: User, processInstanceId: Long, userTaskName: String): 
     return apiClient.processAPI.getHumanTaskInstances(processInstanceId, userTaskName, 0, 1)[0]
 }
 
+// Utility function to wait for a process to be completed:
 fun waitForProcessToFinish() {
     Awaitility.await("Process instance lasts long to complete")
             .atMost(TEN_SECONDS)
@@ -422,7 +430,7 @@ fun waitForProcessToFinish() {
 
 ### Writing tests on top of our application
 
-Let's write some integration tests for our application:
+Now, important step, we have to test our application. Let's write some integration tests for our application:
 ```kotlin
 package org.bonitasoft.loanrequest
 
