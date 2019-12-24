@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    val bonitaEngineVersion = "7.11.2"
+    val bonitaEngineVersion = "7.11.4"
 
     // adding dependency on bonita-engine-spring-boot-starter automatically provides
     // and starts a Bonita Engine when used in a Spring Boot application:
