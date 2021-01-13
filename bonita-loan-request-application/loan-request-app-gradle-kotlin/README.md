@@ -580,5 +580,5 @@ Finally, don't forget to replace the default H2 dependency for your PostgreSQL d
     // runtime("mysql:mysql-connector-java:8.0.14")
      runtime("org.postgresql:postgresql:42.2.5")
     // runtime("com.microsoft.sqlserver:mssql-jdbc:7.2.1.jre8")
-    // Oracle database drivers are not open-source and thus cannot be included here directly
+    // runtime("com.oracle.database.jdbc:ojdbc8::19.3.0.0")
 ```
