@@ -582,3 +582,21 @@ Finally, don't forget to replace the default H2 dependency for your PostgreSQL d
     // runtime("com.microsoft.sqlserver:mssql-jdbc:7.2.1.jre8")
     // runtime("com.oracle.database.jdbc:ojdbc8::19.3.0.0")
 ```
+
+
+## Package your application as a Docker container (optional)
+
+If you use H2 as the database, create a folder to store the database files:
+```shell
+mkdir /tmp/data && chmod 777 /tmp/data
+```
+
+Build the Docker image. From the folder containing the `Dockerfile`, run the following command:
+```shell
+docker build -t bonitasoft/loan-request-app .
+```
+
+Then start the container (optionally mounting the previously created H2 database folder to the `/build` container VOLUME):
+```shell
+docker run -p 8080:8080 -v /tmp/data:/build bonitasoft/loan-request-app:latest
+```
