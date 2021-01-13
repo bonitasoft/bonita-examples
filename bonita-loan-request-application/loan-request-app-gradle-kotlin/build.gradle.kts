@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    val bonitaEngineVersion = "7.11.2"
+    val bonitaEngineVersion = "7.11.4"
 
     // adding dependency on bonita-engine-spring-boot-starter automatically provides
     // and starts a Bonita Engine when used in a Spring Boot application:
@@ -45,7 +45,7 @@ dependencies {
     // runtime("mysql:mysql-connector-java:8.0.14")
     // runtime("org.postgresql:postgresql:42.2.5")
     // runtime("com.microsoft.sqlserver:mssql-jdbc:7.2.1.jre8")
-    // Oracle database drivers are not open-source and thus cannot be included here directly
+    // runtime("com.oracle.database.jdbc:ojdbc8::19.3.0.0")
 }
 
 java.sourceCompatibility = JavaVersion.VERSION_1_8
