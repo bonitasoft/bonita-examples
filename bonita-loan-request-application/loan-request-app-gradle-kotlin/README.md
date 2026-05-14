@@ -12,7 +12,7 @@ In this tutorial, you will learn how to write an application, using Spring Boot 
 Bonita Execution Engine to operate processes.  
 You will learn how to configure Bonita Engine to point to the database of your choice and tune the connection pool.  
 You will learn how to build processes programmatically, deploy and execute them.  
-You will also learn how to deploy processes generated with [Bonita Studio](https://documentation.bonitasoft.com/bonita/current/bonita-bpm-overview).
+You will also learn how to deploy processes generated with [Bonita Studio](https://documentation.ofelia.com/bonita/current/bonita-bpm-overview).
 
 ## Prerequisites
 ### Database
@@ -21,7 +21,7 @@ If you just want to run an embedded H2 database, nothing is required.
 
 To have your application point to a MySQL, PostgreSQL, Microsoft SQL Server, or Oracle database make sure
 you have a Database server up and running, and that it contains a schema dedicated to Bonita Engine (default name is `bonita`).  
-For deeper details on database preparation for Bonita, see [the specific documentation page](https://documentation.bonitasoft.com/bonita/current/database-configuration).  
+For deeper details on database preparation for Bonita, see [the specific documentation page](https://documentation.ofelia.com/bonita/current/database-configuration).  
 Then read below how to [configure the database access](#configure-the-database).
 
 ### Processes
